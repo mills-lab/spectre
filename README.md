@@ -5,7 +5,7 @@ This software is designed to identify regions of active translation from ribosom
 
 ##Required third-party resources:
 ```
-R:			https://www.r-project.org/
+R:		https://www.r-project.org/
 Rpy:		http://rpy.sourceforge.net
 ROCR:		https://rocr.bioinf.mpi-sb.mpg.de/
 Python:		https://www.python.org/
@@ -27,18 +27,19 @@ samtools index <in.bam>
 
 Run SPECtre with default parameters:
 ```
-python SPECtre.py --input <in.bam> \
-		  --output <spectre_results.txt> \
-		  --log <spectre_results.log> \
-		  --fpkm <isoforms.fpkm_tracking> \
-		  --gtf <ensembl.gtf>
+python SPECtre.py \
+		--input <in.bam> \
+		--output <spectre_results.txt> \
+		--log <spectre_results.log> \
+		--fpkm <isoforms.fpkm_tracking> \
+		--gtf <ensembl.gtf>
 ```
 
 ##Supporting Files
 Sample BAM alignment file, Cufflinks output, and Ensembl-formatted GTF are available for testing purposes in the folder *Example*.
 
 ##Output
-*SPECtre* output transcript-level and experiment-level translational metrics in tab-delimited text format. Example output is shown in the folder *Example*.
+*SPECtre* outputs transcript-level and experiment-level translational metrics in tab-delimited text format. Example output is shown in the folder *Example*.
 
 ##Usage
 python SPECtre.py [parameters]
@@ -56,10 +57,10 @@ python SPECtre.py [parameters]
 
 ####Required Analytical Arguments:
 ```
-	--len <INTEGER>, length in nucleotides of sliding window for SPECtre analysis
-	--min <FLOAT>, minimum FPKM required for classification as active translation
-	--fdr <FLOAT>, FDR cutoff to use for calculation of posterior probabilities
-	--type <STRING>, summary statistic to use for SPECtre score: mean, [median], max, nonzero_mean, nonzero_median
+	--len <INTEGER>, length in nucleotides of sliding window for SPECtre analysis (default: 30 nt)
+	--min <FLOAT>, minimum FPKM or reads required for classification as active translation (default: 1 read)
+	--fdr <FLOAT>, FDR cutoff to use for calculation of posterior probabilities (default: 0.05)
+	--type <STRING>, summary statistic to use for SPECtre score (default: median)
 ```
 
 ####Optional Arguments:
