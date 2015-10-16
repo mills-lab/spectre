@@ -42,7 +42,9 @@ Sample BAM alignment file, Cufflinks output, and Ensembl-formatted GTF are avail
 *SPECtre* outputs transcript-level and experiment-level translational metrics in tab-delimited text format. Example output is shown in the folder *Example*.
 
 ##Usage
+```
 python SPECtre.py [parameters]
+```
 
 ###Parameters:
 
@@ -55,7 +57,7 @@ python SPECtre.py [parameters]
 	--gtf, location of annotation file in GTF format (only Ensembl supported currently)
 ```
 
-####Required Analytical Arguments:
+####User-defined Analytical Arguments:
 ```
 	--len <INTEGER>, length in nucleotides of sliding window for SPECtre analysis (default: 30 nt)
 	--min <FLOAT>, minimum FPKM or reads required for classification as active translation (default: 1 read)
