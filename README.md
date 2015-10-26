@@ -60,7 +60,7 @@ python SPECtre.py [parameters]
 ####User-defined Analytical Arguments:
 ```
 	--len <INTEGER>, length in nucleotides of sliding window for SPECtre analysis (default: 30 nt)
-	--min <FLOAT>, minimum FPKM or reads required for classification as active translation (default: 1 read)
+	--min <FLOAT>, minimum FPKM or reads required for classification as active translation (default: 5 FPKM)
 	--fdr <FLOAT>, FDR cutoff to use for calculation of posterior probabilities (default: 0.05)
 	--type <STRING>, summary statistic to use for SPECtre score (default: median)
 ```
