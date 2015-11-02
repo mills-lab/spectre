@@ -193,13 +193,13 @@ Note the directory location of these files for future steps.
 	  	6) gene biotype
 	  	7) ribosome profiling FPKM
 	  	9) spectre_metric [5'UTR]
-	     10) spectre_posterior_probability [5'UTR]
-	     11) spectre_metric [CDS]
-	     12) spectre_posterior_probability [CDS]
-	     13) spectre_metric [3'UTR]
-	     14) spectre_posterior_probability [3'UTR]
-	       ---
-	       Full Transcript Spectral Coherence, FLOSS, and ORFscore will follow the same generalized output format as that of SPECtre (above).
+	   10) spectre_posterior_probability [5'UTR]
+	   11) spectre_metric [CDS]
+	   12) spectre_posterior_probability [CDS]
+	   13) spectre_metric [3'UTR]
+	   14) spectre_posterior_probability [3'UTR]
+	   ---
+	   Full Transcript Spectral Coherence, FLOSS, and ORFscore will follow the same generalized output format as that of SPECtre (above).
 	       
 	       Specification of --verbose in the command-line input will generate additonal output, including:
 	       - coordinates annoated for each region tested (5'UTR, CDS/Exon, 3'UTR)
