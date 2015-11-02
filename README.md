@@ -90,14 +90,41 @@ python SPECtre.py \
 		--orfscore
 ```
 
-##Pre-processing:
-Following are examples of the command-line inputs and parameters used to generate the necessary input files for SPECtre analysis:
+##Analytical Pipeline
+Example SPECtre analysis of mESC (Ingolia, 2014) ribosome profiling data.
 
-###Download Transcript GTF File:
+###Download Required Sequence and Annotation Files
+####Transcript GTF:
 ```
-http://www.ensembl.org/info/data/ftp/index.html
-
-For previous versions, access the archives at: http://www.ensembl.org/Help/ArchiveList
+	ftp://ftp.ensembl.org/pub/release-78/gtf/mus_musculus/
+	
+	Download the archived Mus_musculus.GRCm38.78.gtf file.
 ```
+####Reference FASTAs:
+```
+	ftp://ftp.ensembl.org/pub/release-78/fasta/mus_musculus/dna/
+	
+	Download the unmasked genomic FASTA files (1-19, MT, X and Y), files should be named according to the format:
+	Mus_musculus.GRCm38.dna.chromosome.N.fa.gz (where N = chromosome ID, see above)
+	
+	Individual chromosome FASTA files may be concatenated for ease-of-use by downstream applications (see: Index Genomic FASTAs)
+```
+####rRNA Contaminant FASTA:
+```
+	wget ftp://igenome:G3nom3s4u@ussd-ftp.illumina.com/Mus_musculus/UCSC/mm10/Mus_musculus_UCSC_mm10.tar.gz
 
-###Do
+	Extract the appropriate musRibosomal.fa file from the contaminants folder.
+```
+Note the directory location of these files for future steps.
+
+###Index Genomic and Ribosomal Sequences
+####Index Genomic FASTAs:
+```
+	bowtie-build <reference_fasta_files> <genomic_index_name>
+	
+	If TopHat2 is required for alignment, bowtie2 indexes must also be built.
+```
+####Index rRNA Contaminants:
+```
+	bowtie-build <rRNA_fasta_files> <rRNA_index_name>
+```
