@@ -201,10 +201,10 @@ Note the directory location of these files for future steps.
 	   ---
 	   Full Transcript Spectral Coherence, FLOSS, and ORFscore will follow the same generalized output format as that of SPECtre (above).
 	       
-	       Specification of --verbose in the command-line input will generate additonal output, including:
-	       - coordinates annoated for each region tested (5'UTR, CDS/Exon, 3'UTR)
-	       - coherence estimates over each window in a region
-	       - posterior probabilities for each coherence estimate over a region
-	       - FLOSS read length distributions
-	       - ORFscore frame distributions
+	   Specification of --verbose in the command-line input will generate additonal output, including:
+	   - coordinates annoated for each region tested (5'UTR, CDS/Exon, 3'UTR)
+	   - coherence estimates over each window in a region
+	   - posterior probabilities for each coherence estimate over a region
+	   - FLOSS read length distributions
+	   - ORFscore frame distributions
 ```
