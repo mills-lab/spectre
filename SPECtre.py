@@ -944,7 +944,7 @@ class ExperimentMetrics(object):
 			r('active <- data.frame(SPEC=c(%s), biotype="translated")' %",".join(str(n) for n in translated))
 			r('inactive <- data.frame(SPEC=c(%s), biotype="not_translated")' %",".join(str(n) for n in untranslated))
 			r('scores <- rbind(active, inactive)')
-			return str(r('performance(prediction(scores$SPEC, scores$biotype), "auc")@y.values[[1]]')[0])
+			return str(r('performance(prediction(-scores$SPEC, scores$biotype), "auc")@y.values[[1]]')[0])
 		logger.info("EXPERIMENT_METRICS: Calculating experiment-level ORFscore AUC [COMPLETE].")
 
 	def full_auc(self):
