@@ -9,6 +9,7 @@ R:			https://www.r-project.org/
 Rpy:		http://rpy.sourceforge.net
 ROCR:		https://rocr.bioinf.mpi-sb.mpg.de/
 Python:		https://www.python.org/
+bx-python:	https://bitbucket.org/james_taylor/bx-python/wiki/Home
 samtools:	http://samtools.sourceforge.net/
 ```
 
@@ -36,10 +37,10 @@ python SPECtre.py \
 ```
 
 ##Supporting Files
-Sample BAM alignment file, Cufflinks output, and Ensembl-formatted GTF are available for testing purposes in the folder *Example*.
+Sample BAM alignment file, Cufflinks output, and Ensembl-formatted GTF are available for testing purposes in the folder *test*.
 
 ##Output
-*SPECtre* outputs transcript-level and experiment-level translational metrics in tab-delimited text format. Example output is shown in the folder *Example*.
+*SPECtre* outputs transcript-level and experiment-level translational metrics in tab-delimited text format. Example output is shown in the folder *test*.
 
 ##Usage
 ```
@@ -74,3 +75,29 @@ python SPECtre.py [parameters]
 	--sanitize, removes overlapping and proximally-located transcripts from analyses
 	--verbose, print additional optional metrics to the output file
 ```
+
+##Test Data:
+Test data is derived from ribosome profiling of human SH-SY5Y cells and limited to a single chromosome (3) for space allocation purposes. Similarly, the *.fpkm_tracking input file and test GTF are limited to a single choromosome. To run test analysis with default parameters:
+```
+python SPECtre.py \
+		--input test/test.bam \
+		--output test/spectre_test.txt \
+		--log test/spectre_test.log \
+		--fpkm test/isoforms-test.fpkm_tracking \
+		--gtf test/Homo_sapiens.GRCh38.78.test.gtf \
+		--full \
+		--floss \
+		--orfscore
+```
+
+##Pre-processing:
+Following are examples of the command-line inputs and parameters used to generate the necessary input files for SPECtre analysis:
+
+###Download Transcript GTF File:
+```
+http://www.ensembl.org/info/data/ftp/index.html
+
+For previous versions, access the archives at: http://www.ensembl.org/Help/ArchiveList
+```
+
+###Do
