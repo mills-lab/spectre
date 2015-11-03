@@ -1062,7 +1062,7 @@ def print_metrics(output_file, transcript_stats, experiment_stats, gtf, fpkms, a
 				header += "\tORF_reads_5UTR\tORF_reads_CDS\tORF_reads_3UTR"
 
 	output_file.write("# Parameters:" + write_parameters(parameters, analyses) + "\n")
-	#output_file.write("\n# Experiment Metrics:" + write_experiment_metrics(experiment_stats))
+	output_file.write("\n# Experiment Metrics:" + write_experiment_metrics(experiment_stats))
 
 	output_file.write(header)
 	count = 1
@@ -1114,7 +1114,7 @@ if __name__ == "__main__":
 	parser.add_argument("--discovery", action="store_true", default="store_false", help="enable discovery mode, see README for details")
 	spectre_args = parser.add_argument_group("parameters for SPECtre analysis:")
 	spectre_args.add_argument("--len", action="store", required=False, nargs="?", default=30, metavar="INT", help="length of sliding window (default: %(default)s)")
-	spectre_args.add_argument("--min", action="store", required=False, nargs="?", default=5, metavar="FLOAT", help="minimum FPKM for active translation (default: %(default)s read)")
+	spectre_args.add_argument("--min", action="store", required=False, nargs="?", default=5, metavar="FLOAT", help="minimum FPKM for active translation (default: %(default)s FPKM)")
 	spectre_args.add_argument("--fdr", action="store", required=False, nargs="?", default=0.05, metavar="FLOAT", help="FDR cutoff (default: %(default)s)")
 	spectre_args.add_argument("--type", action="store", required=False, nargs="?", default="median", metavar="TYPE", choices=["mean","median","max","nonzero_mean","nonzero_median"], help="metric for SPECtre analysis (choices: mean,[median],max,nonzero_mean,nonzero_median)")
 	file_args = parser.add_argument_group("required input and output parameters:")
@@ -1189,12 +1189,6 @@ if __name__ == "__main__":
 	# signal plots (based on windowed spectral coherence).
 	
 	experiment_metrics = ExperimentMetrics(transcript_metrics, transcript_fpkms, analyses, args.min, args.fdr)
-	print "EXPERIMENT METRICS:"
-	print "Threshold =", experiment_metrics.translation_threshold()
-	print "SPECtre_AUC =", experiment_metrics.spectre_auc()
-	print "FULL_AUC =", experiment_metrics.full_auc()
-	print "FLOSS_AUC =", experiment_metrics.floss_auc()
-	print "ORFscore_AUC =", experiment_metrics.orfscore_auc()
 
 	# Print the results table to the output file:
 	print_metrics(open(args.output,"w"), transcript_metrics, experiment_metrics, transcript_gtf, transcript_fpkms, analyses, args, args.verbose)
