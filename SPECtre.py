@@ -1,4 +1,4 @@
-#!/home/stonyc/sw/python-2.7.8/bin/python:
+#!/home/stonyc/sw/python-2.7.8/bin/python
 
 # DESCRIPTION: Takes as input a BAM alignment file of ribosome profiling reads,
 # gene or transcript abundance estimates from Cufflinks (mRNA-Seq or ribo-Seq)
