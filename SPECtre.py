@@ -299,9 +299,8 @@ class Alignment(object):
 	# = 7 sequence match
 	# X 8 sequence mismatch
 
-	def __init__(self, bam_file, offset_method):
+	def __init__(self, bam_file):
 		self.bam_file = bam_file
-		self.offset_method = offset_method
 
 	def coverage(self):
 
@@ -342,13 +341,8 @@ class Alignment(object):
 			else:
 				return extract_coordinates_from_cigar(pos, cigar)[-calculate_offset(offsets, length)]
 
-		offsets = dict()
-		if self.offset_method == "ingolia":
-			offsets = {26: 14, 27: 14, 28: 14, 29: 14, 30: 15, 31: 15}
-		else:
-			offsets = {26: 12, 27: 12, 28: 12, 29: 12, 30: 12, 31: 12}
+		offsets = {"ingolia": {26: 15, 27: 14, 28: 14, 30: 15, 31: 15}, "bazzini": {26: 12, 27: 12, 28: 12, 29: 12, 30: 12, 31: 12}}
 
-		logger.info("LOADING " + self.offset_method + " reads: STARTED")	
 		logger.info("(in Alignment_coverage) Loading BAM/SAM alignment file: " + self.bam_file + " into coverage [STARTED].")
 		# Load reads from BAM alignment file into a coverage IntervalTree() object:
 		coverage = dict()
@@ -357,18 +351,25 @@ class Alignment(object):
 			sam = SAM(read)
 			# Convert SAM field values into required input formats for coverage functions:
 			strand = decode(sam.flag())
-			offset_position = offset_read_position(int(sam.pos()), strand, len(sam.seq()), sam.cigar(), offsets)
+			offset_position_a = offset_read_position(int(sam.pos()), strand, len(sam.seq()), sam.cigar(), offsets["ingolia"])
+			offset_position_p = offset_read_position(int(sam.pos()), strand, len(sam.seq()), sam.cigar(), offsets["bazzini"])
 			# Load the read into the IntervalTree():
 			tree = None
-			seq_id = sam.rname() + "|" + strand
-			if seq_id in coverage:
-				tree = coverage[seq_id]
+			seq_id_a = sam.rname() + "a|" + strand
+			if seq_id_a in coverage:
+				tree = coverage[seq_id_a]
 			else:
 				tree = IntervalTree()
-				coverage[seq_id] = tree
-			tree.add(offset_position, offset_position, read)
+				coverage[seq_id_a] = tree
+			tree.add(offset_position_a, offset_position_a, read)
+			seq_id_p = sam.rname() + "p|" + strand
+			if seq_id_p in coverage:
+				tree = coverage[seq_id_p]
+			else:
+				tree = IntervalTree()
+				coverage[seq_id_p] = tree
+			tree.add(offset_position_p, offset_position_p, read)
 		logger.info("(in Alignment_coverage) Loading BAM/SAM alignment file: " + self.bam_file + " into coverage [COMPLETE].")
-		logger.info("LOADING " + self.offset_method + " reads: COMPLETE")	
 		return coverage
 
 class Coverage(object):
@@ -380,18 +381,18 @@ class Coverage(object):
 		chr: Chromosome ID in Ensembl format.
 		strand: The strand of the region to be tested.
 		coordinates: The coordinates over which to extract read coverage.
-		buffer: Trimming buffer for transcript boundaries.
-		coverage_tracker: An IntervalTree() coverage object extract from a BAM/SAM.
+		asite_buffer: Trimming buffer for transcript boundaries based on A-site position.
+		psite_buffer: Trimming buffer for transcript boundaries based on P-site position.
+		reads_tracker: An IntervalTree() coverage object extract from a BAM/SAM.
 	'''
 
-	def __init__(self, chr, strand, coordinates, asite_buffer, psite_buffer, asite_tracker, psite_tracker):
+	def __init__(self, chr, strand, coordinates, asite_buffer, psite_buffer, reads_tracker):
 		self.chr = chr
 		self.strand = strand
 		self.coordinates = coordinates
 		self.asite_buffer = asite_buffer
 		self.psite_buffer = psite_buffer
-		self.asite_tracker = asite_tracker
-		self.psite_tracker = psite_tracker
+		self.reads_tracker = reads_tracker
 
 	def normalized_asite_coverage(self):
 		'''
@@ -420,7 +421,7 @@ class Coverage(object):
 		tree.find(2,4)
 		[Interval(3,3)]
 		'''
-		if not self.asite_tracker:
+		if not self.reads_tracker:
 			return "NA"
 		else:
 			region = list()
@@ -428,10 +429,10 @@ class Coverage(object):
 				# Since Python indexes are 0-based:
 				start, end = int(coordinate[0]), int(coordinate[-1])+1
 				for position in range(start, end):
-					seq_id = self.chr + "|" + self.strand
-					if seq_id in self.asite_tracker:
+					seq_id = self.chr + "a|" + self.strand
+					if seq_id in self.reads_tracker:
 						overlaps = list()
-						overlaps.extend(self.asite_tracker[seq_id].find(position-1, position+1))
+						overlaps.extend(self.reads_tracker[seq_id].find(position-1, position+1))
 						region.append(len(overlaps))
 					else:
 						region.append(0)
@@ -451,7 +452,7 @@ class Coverage(object):
 		Given the chromosome, strand, coordinates, and the FLOSS-based regional buffer,
 		return the A-site reads over the designated region.
 		'''
-		if not(self.asite_tracker):
+		if not(self.reads_tracker):
 			return "NA"
 		else:
 			reads = dict()
@@ -474,10 +475,10 @@ class Coverage(object):
 					else:
 						expanded_coordinates = expanded_coordinates[0:self.asite_buffer[0]]
 			for position in expanded_coordinates:
-				seq_id = self.chr + "|" + self.strand
-				if seq_id in self.asite_tracker:
+				seq_id = self.chr + "a|" + self.strand
+				if seq_id in self.reads_tracker:
 					overlaps = list()
-					overlaps.extend(self.asite_tracker[seq_id].find(position-1, position+1))
+					overlaps.extend(self.reads_tracker[seq_id].find(position-1, position+1))
 					for read in overlaps:
 						read_length = len(read.split("\t")[9])
 						if read_length in reads:
@@ -491,7 +492,7 @@ class Coverage(object):
 		Given the chromosome, strand, coordinates, and the ORFscore-based regional buffer,
 		return the P-site reads over the designated region.
 		'''
-		if not(self.psite_tracker):
+		if not(self.reads_tracker):
 			return "NA"
 		else:
 			frames = list()
@@ -516,10 +517,10 @@ class Coverage(object):
 			# Collect the read depth over the trimmed coordinates:
 			region = list()
 			for position in expanded_coordinates:
-				seq_id = self.chr + "|" + self.strand
-				if seq_id in self.psite_tracker:
+				seq_id = self.chr + "p|" + self.strand
+				if seq_id in self.reads_tracker:
 					overlaps = list()
-					overlaps.extend(self.psite_tracker[seq_id].find(position-1, position+1))
+					overlaps.extend(self.reads_tracker[seq_id].find(position-1, position+1))
 					region.append(len(overlaps))
 				else:
 					region.append(0)
@@ -663,9 +664,9 @@ class Reference(object):
 	for each transcript.
 	'''
 
-	def __init__(self, gtf, asite_tracker, buffers):
+	def __init__(self, gtf, reads_tracker, buffers):
 		self.gtf = gtf
-		self.asite_tracker = asite_tracker
+		self.reads_tracker = reads_tracker
 		self.asite_buffers = asite_buffers
 
 	def distribution(self):
@@ -677,7 +678,7 @@ class Reference(object):
 					for transcript in self.gtf[chr][strand][gene]:
 						for feature in self.gtf[chr][strand][gene][transcript]:
 							if feature == "CDS":
-								region = Coverage(chr, strand, self.gtf[chr][strand][gene][transcript][feature], asite_buffers["CDS"], (0,0), self.asite_tracker, dict())
+								region = Coverage(chr, strand, self.gtf[chr][strand][gene][transcript][feature], asite_buffers["CDS"], (0,0), self.reads_tracker)
 								if not region.asite_reads():
 									pass
 								else:
@@ -787,7 +788,7 @@ def build_translated_distributions(transcript_scores, transcript_fpkms, fpkm_cut
 													untranslated_scores.append(transcript_scores[gene_type][chr][strand][gene][transcript][feature][analysis]["score"])
 	return translated_scores, untranslated_scores
 
-def calculate_transcript_metrics(gtf, fpkms, asite_buffer, asite_tracker, psite_buffer, psite_tracker, cutoff, window_length, reference_distribution, spectre_analysis, methods):
+def calculate_transcript_metrics(gtf, fpkms, asite_buffer, psite_buffer, reads_tracker, cutoff, window_length, reference_distribution, spectre_analysis, methods):
 
 	'''
 	For each transcript, this function is to calculate (if so designated) its SPECtre metrics
@@ -796,7 +797,7 @@ def calculate_transcript_metrics(gtf, fpkms, asite_buffer, asite_tracker, psite_
 	SPECtre metrics over a given window length(s) will also be calculated.
 	'''
 
-	def calculate_transcript_scores(gtf, fpkms, asite_buffer, asite_tracker, psite_buffer, psite_tracker, window_length, reference_distribution, spectre_analsyis, methods):
+	def calculate_transcript_scores(gtf, fpkms, asite_buffer, psite_buffer, reads_tracker, window_length, reference_distribution, spectre_analsyis, methods):
 		logger.info("(in calculate_transcript_scores) Calculating transcript-level metrics [STARTED].")
 		scores = dict()
 		for gene_type in gtf:
@@ -806,10 +807,10 @@ def calculate_transcript_metrics(gtf, fpkms, asite_buffer, asite_tracker, psite_
 						for transcript in gtf[gene_type][chr][strand][gene]:
 							for feature in gtf[gene_type][chr][strand][gene][transcript]:
 								if feature in ("CDS", "exon"):
-									region = Coverage(chr, strand, gtf[gene_type][chr][strand][gene][transcript][feature], asite_buffer["CDS"], psite_buffer["CDS"], asite_tracker, psite_tracker)
+									region = Coverage(chr, strand, gtf[gene_type][chr][strand][gene][transcript][feature], asite_buffer["CDS"], psite_buffer["CDS"], reads_tracker)
 									check = Checks(region.normalized_asite_coverage(), region.psite_frames(), strand, window_length, (asite_buffer["CDS"], psite_buffer["CDS"]), fpkms, transcript)
 								else:
-									region = Coverage(chr, strand, gtf[gene_type][chr][strand][gene][transcript][feature], asite_buffer["UTR"], psite_buffer["UTR"], asite_tracker, psite_tracker)
+									region = Coverage(chr, strand, gtf[gene_type][chr][strand][gene][transcript][feature], asite_buffer["UTR"], psite_buffer["UTR"], reads_tracker)
 									check = Checks(region.normalized_asite_coverage(), region.psite_frames(), strand, window_length, (asite_buffer["UTR"], psite_buffer["UTR"]), fpkms, transcript)
 								if (check.trimming() == True) and (check.coverage() == True) and (check.frames() == True) and (check.fpkm() == True):
 									# Calculate SPECtre using given window length:
@@ -861,7 +862,7 @@ def calculate_transcript_metrics(gtf, fpkms, asite_buffer, asite_tracker, psite_
 		return windowed
 
 	logger.info("(in calculate_transcript_metrics) Calculating transcript-level posterior probabilites [STARTED].")
-	transcript_scores = calculate_transcript_scores(gtf, fpkms, asite_buffer, asite_tracker, psite_buffer, psite_tracker, window_length, reference_distribution, spectre_analysis, methods)
+	transcript_scores = calculate_transcript_scores(gtf, fpkms, asite_buffer, psite_buffer, reads_tracker, window_length, reference_distribution, spectre_analysis, methods)
 	translated_scores, untranslated_scores = build_translated_distributions(transcript_scores, fpkms, cutoff, "SPEC")
 	for gene_type in transcript_scores:
 		for chr in transcript_scores[gene_type]:
@@ -1032,7 +1033,7 @@ def print_metrics(output_file, transcript_stats, experiment_stats, gtf, fpkms, a
 			return "NA"
 
 	def write_experiment_metrics(experiment_stats):
-		metric_string = "\n# Translation Threshold = " + str(experiment_stats.translation_threshold()) + "\n# SPECtre AUC = " + str(experiment_stats.spectre_auc()) + "\n# Full AUC = " + return_experiment_metric(experiment_stats, "Full") + "\n# FLOSS AUC = " + return_experiment_metric(experiment_stats, "FLOSS") + "\n# ORFscore AUC = " + return_experiment_metric(experiment_stats, "ORFscore")
+		metric_string = "\n# Translation Threshold = " + str(experiment_stats.translation_threshold()) + "\n# SPECtre AUC = " + str(experiment_stats.spectre_auc()) + "\n# Full AUC = " + return_experiment_metric(experiment_stats, "Full") + "\n# FLOSS AUC = " + return_experiment_metric(experiment_stats, "FLOSS") + "\n# ORFscore AUC = " + return_experiment_metric(experiment_stats, "ORFscore\n")
 		return metric_string
 
 	# Instantiate necessary R packages:
@@ -1062,7 +1063,7 @@ def print_metrics(output_file, transcript_stats, experiment_stats, gtf, fpkms, a
 				header += "\tORF_reads_5UTR\tORF_reads_CDS\tORF_reads_3UTR"
 
 	output_file.write("# Parameters:" + write_parameters(parameters, analyses) + "\n")
-	output_file.write("\n# Experiment Metrics:" + write_experiment_metrics(experiment_stats))
+	output_file.write("# Experiment Metrics:" + write_experiment_metrics(experiment_stats))
 
 	output_file.write(header)
 	count = 1
@@ -1164,14 +1165,12 @@ if __name__ == "__main__":
 		analyses.append("Full")
 
 	# Convert the aligned reads from the provided BAM/SAM file into an IntervalTree()
-	# coverage object (may be necessary to compute coverage based on the default
-	# Ingolia (A-site) offsets, and the Bazzini (P-ste) offsets. A-site adjusted
-	# coverage is the default for SPECtre analysis.
-	asite_reads = Alignment(args.input, "ingolia")
-	psite_reads = Alignment(args.input, "bazzini")
+	# coverage object. To consolidate coverage for both A-site and P-site read coverage
+	# the adjusted alignments will be computed simultaneously.
+	offset_reads = Alignment(args.input)
 
 	# Calculate the reference read distribution for FLOSS metric calculation:
-	reference_reads = Reference(transcript_gtf["protein_coding"], asite_reads.coverage(), asite_buffers)
+	reference_reads = Reference(transcript_gtf["protein_coding"], offset_reads.coverage(), asite_buffers)
 
 	if args.floss == True:
 		analyses.append("FLOSS")
@@ -1182,7 +1181,7 @@ if __name__ == "__main__":
 	# designated window length), SPECtre transcript codon signal (for each window length
 	# specified), FLOSS metric and read distribution (if required), and ORFscore metric and reading frame
 	# distribution (if required).
-	transcript_metrics = calculate_transcript_metrics(transcript_gtf, transcript_fpkms, asite_buffers, asite_reads.coverage(), psite_buffers, psite_reads.coverage(), args.min, args.len, reference_reads.distribution(), args.type, analyses)
+	transcript_metrics = calculate_transcript_metrics(transcript_gtf, transcript_fpkms, asite_buffers, psite_buffers, offset_reads.coverage(), args.min, args.len, reference_reads.distribution(), args.type, analyses)
 
 	# Perform a second-pass global analysis based on the transcript-level metrics, such as:
 	# ROC analyses, posterior probability as a function of empirical FDR, and codon window

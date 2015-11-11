@@ -58,3 +58,76 @@
 2015-11-02 10:27:47,541 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level Spectral Coherence AUC [STARTED].
 2015-11-02 10:27:47,573 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level FLOSS AUC [STARTED].
 2015-11-02 10:27:47,620 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level ORFscore AUC [STARTED].
+2015-11-04 11:34:48,077 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [STARTED]
+2015-11-04 11:34:48,077 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-04 11:34:49,675 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-04 11:34:49,720 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [COMPLETE]
+2015-11-04 11:34:49,731 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory... [STARTED]
+2015-11-04 11:34:49,769 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory.... [COMPLETE]
+2015-11-04 11:34:49,769 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-04 11:34:51,928 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-04 11:34:51,928 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [STARTED].
+2015-11-04 11:35:12,266 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [STARTED]
+2015-11-04 11:35:12,266 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-04 11:35:13,667 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-04 11:35:13,706 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [COMPLETE]
+2015-11-04 11:35:13,716 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory... [STARTED]
+2015-11-04 11:35:13,748 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory.... [COMPLETE]
+2015-11-04 11:35:13,748 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-04 11:35:15,083 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-04 11:35:15,083 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [STARTED].
+2015-11-04 11:35:31,848 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [STARTED]
+2015-11-04 11:35:31,848 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-04 11:35:33,237 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-04 11:35:33,283 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [COMPLETE]
+2015-11-04 11:35:33,294 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory... [STARTED]
+2015-11-04 11:35:33,332 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory.... [COMPLETE]
+2015-11-04 11:35:33,332 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-04 11:35:34,812 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-04 11:35:34,812 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [STARTED].
+2015-11-04 11:36:09,772 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [COMPLETE].
+2015-11-04 11:36:09,782 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [STARTED].
+2015-11-04 11:36:45,368 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [COMPLETE].
+2015-11-04 11:38:58,192 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [STARTED]
+2015-11-04 11:38:58,192 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-04 11:38:59,640 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-04 11:38:59,679 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [COMPLETE]
+2015-11-04 11:38:59,689 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory... [STARTED]
+2015-11-04 11:38:59,725 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory.... [COMPLETE]
+2015-11-04 11:38:59,725 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-04 11:39:01,136 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-04 11:39:01,136 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [STARTED].
+2015-11-04 11:39:37,427 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [COMPLETE].
+2015-11-04 11:39:37,438 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [STARTED].
+2015-11-04 11:40:10,337 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [COMPLETE].
+2015-11-04 11:41:40,751 - __main__ - INFO - (in calculate_transcript_metrics) Calculating transcript-level posterior probabilites [STARTED].
+2015-11-04 11:41:40,751 - __main__ - INFO - (in calculate_transcript_scores) Calculating transcript-level metrics [STARTED].
+2015-11-09 09:57:09,353 - __main__ - INFO - (in calculate_transcript_scores) Calculating transcript-level metrics [COMPLETE].
+2015-11-09 09:57:55,815 - __main__ - INFO - (in calculate_transcript_metrics) Calculating transcript-level posterior probabilites [COMPLETE].
+2015-11-09 09:57:56,074 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level translation threshold [STARTED].
+2015-11-09 09:57:56,081 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level translation threshold [COMPLETE].
+2015-11-09 09:57:56,093 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level SPECtre AUC [STARTED].
+2015-11-09 09:57:56,122 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level Spectral Coherence AUC [STARTED].
+2015-11-09 09:57:56,152 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level FLOSS AUC [STARTED].
+2015-11-09 09:57:56,182 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level ORFscore AUC [STARTED].
+2015-11-11 10:49:13,477 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [STARTED]
+2015-11-11 10:49:13,477 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-11 10:49:15,006 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-11 10:49:15,049 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [COMPLETE]
+2015-11-11 10:49:15,059 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory... [STARTED]
+2015-11-11 10:49:15,094 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory.... [COMPLETE]
+2015-11-11 10:49:15,094 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-11 10:49:16,502 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-11 10:49:16,502 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [STARTED].
+2015-11-11 10:49:48,215 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [COMPLETE].
+2015-11-11 10:49:48,226 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [STARTED].
+2015-11-11 10:50:19,770 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [COMPLETE].
+2015-11-11 10:51:54,006 - __main__ - INFO - (in calculate_transcript_metrics) Calculating transcript-level posterior probabilites [STARTED].
+2015-11-11 10:51:54,006 - __main__ - INFO - (in calculate_transcript_scores) Calculating transcript-level metrics [STARTED].
+2015-11-11 11:47:29,188 - __main__ - INFO - (in calculate_transcript_scores) Calculating transcript-level metrics [COMPLETE].
+2015-11-11 11:48:19,161 - __main__ - INFO - (in calculate_transcript_metrics) Calculating transcript-level posterior probabilites [COMPLETE].
+2015-11-11 11:48:19,409 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level translation threshold [STARTED].
+2015-11-11 11:48:19,416 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level translation threshold [COMPLETE].
+2015-11-11 11:48:19,427 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level SPECtre AUC [STARTED].
+2015-11-11 11:48:19,460 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level Spectral Coherence AUC [STARTED].
+2015-11-11 11:48:19,492 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level FLOSS AUC [STARTED].
