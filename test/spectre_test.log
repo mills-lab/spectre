@@ -131,3 +131,25 @@
 2015-11-11 11:48:19,427 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level SPECtre AUC [STARTED].
 2015-11-11 11:48:19,460 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level Spectral Coherence AUC [STARTED].
 2015-11-11 11:48:19,492 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level FLOSS AUC [STARTED].
+2015-11-13 10:19:23,313 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [STARTED]
+2015-11-13 10:19:23,313 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-13 10:19:24,733 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-13 10:19:24,779 - __main__ - INFO - (in interval_tree) Parsing transcript intervals from GTF into an IntervalTree()... [COMPLETE]
+2015-11-13 10:19:24,789 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory... [STARTED]
+2015-11-13 10:19:24,829 - __main__ - INFO - (in fpkms) Parsing transcript FPKMs from file: isoforms-test.fpkm_tracking into memory.... [COMPLETE]
+2015-11-13 10:19:24,829 - __main__ - INFO - (in anno) Parsing transcripts from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [STARTED]
+2015-11-13 10:19:26,173 - __main__ - INFO - (in anno) Parsing transcript coordinates from GTF: Homo_sapiens.GRCh38.78.test.gtf into memory... [COMPLETE]
+2015-11-13 10:19:26,174 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [STARTED].
+2015-11-13 10:20:00,313 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [COMPLETE].
+2015-11-13 10:20:00,324 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [STARTED].
+2015-11-13 10:20:34,920 - __main__ - INFO - (in Alignment_coverage) Loading BAM/SAM alignment file: test.bam into coverage [COMPLETE].
+2015-11-13 10:22:12,455 - __main__ - INFO - (in calculate_transcript_metrics) Calculating transcript-level posterior probabilites [STARTED].
+2015-11-13 10:22:12,455 - __main__ - INFO - (in calculate_transcript_scores) Calculating transcript-level metrics [STARTED].
+2015-11-13 11:17:35,804 - __main__ - INFO - (in calculate_transcript_scores) Calculating transcript-level metrics [COMPLETE].
+2015-11-13 11:18:32,088 - __main__ - INFO - (in calculate_transcript_metrics) Calculating transcript-level posterior probabilites [COMPLETE].
+2015-11-13 11:18:32,359 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level translation threshold [STARTED].
+2015-11-13 11:18:32,366 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level translation threshold [COMPLETE].
+2015-11-13 11:18:32,378 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level SPECtre AUC [STARTED].
+2015-11-13 11:18:32,408 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level Spectral Coherence AUC [STARTED].
+2015-11-13 11:18:32,443 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level FLOSS AUC [STARTED].
+2015-11-13 11:18:32,472 - __main__ - INFO - EXPERIMENT_METRICS: Calculating experiment-level ORFscore AUC [STARTED].

@@ -1033,7 +1033,7 @@ def print_metrics(output_file, transcript_stats, experiment_stats, gtf, fpkms, a
 			return "NA"
 
 	def write_experiment_metrics(experiment_stats):
-		metric_string = "\n# Translation Threshold = " + str(experiment_stats.translation_threshold()) + "\n# SPECtre AUC = " + str(experiment_stats.spectre_auc()) + "\n# Full AUC = " + return_experiment_metric(experiment_stats, "Full") + "\n# FLOSS AUC = " + return_experiment_metric(experiment_stats, "FLOSS") + "\n# ORFscore AUC = " + return_experiment_metric(experiment_stats, "ORFscore\n")
+		metric_string = "\n# Translation Threshold = " + str(experiment_stats.translation_threshold()) + "\n# SPECtre AUC = " + str(experiment_stats.spectre_auc()) + "\n# Full AUC = " + return_experiment_metric(experiment_stats, "Full") + "\n# FLOSS AUC = " + return_experiment_metric(experiment_stats, "FLOSS") + "\n# ORFscore AUC = " + return_experiment_metric(experiment_stats, "ORFscore")
 		return metric_string
 
 	# Instantiate necessary R packages:
@@ -1063,7 +1063,7 @@ def print_metrics(output_file, transcript_stats, experiment_stats, gtf, fpkms, a
 				header += "\tORF_reads_5UTR\tORF_reads_CDS\tORF_reads_3UTR"
 
 	output_file.write("# Parameters:" + write_parameters(parameters, analyses) + "\n")
-	output_file.write("# Experiment Metrics:" + write_experiment_metrics(experiment_stats))
+	output_file.write("\n# Experiment Metrics:" + write_experiment_metrics(experiment_stats))
 
 	output_file.write(header)
 	count = 1
