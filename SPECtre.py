@@ -1079,6 +1079,25 @@ def print_metrics(output_file, transcript_stats, experiment_stats, gtf, fpkms, a
 									line += "\t" + return_coordinates(gtf, gene_type, chr, strand, gene, transcript, feature)
 							else:
 								line += "\tNA\t" + return_coordinates(gtf, gene_type, chr, strand, gene, transcript, "exon") + "\tNA"
+							for analysis in analyses:
+								if analysis in ("SPECtre", "Full"):
+									if gene_type == "protein_coding":
+										for feature in ("UTR5", "CDS", "UTR3"):
+											line += "\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, feature, analysis)
+									else:
+										line += "\tNA\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA"
+									if verbose_check == True:
+										if gene_type == "protein_coding":
+											for feature in ("UTR5", "CDS", "UTR3"):
+												line += "\t" + return_extras(transcript_stats, gene_type, chr, strand, gene, transcript, feature, analysis)
+										else:
+											line += "\tNA\t" + return_extras(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA"
+								else:
+									if gene_type == "protein_coding":
+										for feature in ("UTR5", "CDS", "UTR3"):
+											line += "\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, feature, analysis)
+									else:
+										line += "\tNA\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA"
 						else:
 							for analysis in analyses:
 								if analysis in ("SPECtre", "Full"):
@@ -1087,12 +1106,6 @@ def print_metrics(output_file, transcript_stats, experiment_stats, gtf, fpkms, a
 											line += "\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, feature, analysis)
 									else:
 										line += "\tNA\tNA\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA\tNA"
-									if verbose_check == True:
-										if gene_type == "protein_coding":
-											for feature in ("UTR5", "CDS", "UTR3"):
-												line += return_extras(transcript_stats, gene_type, chr, strand, gene, transcript, feature, analysis)
-										else:
-											line += return_extras(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis)
 								else:
 									if gene_type == "protein_coding":
 										for feature in ("UTR5", "CDS", "UTR3"):
