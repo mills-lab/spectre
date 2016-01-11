@@ -37,7 +37,7 @@ from rpy2.robjects.packages import importr
 from bx.intervals.intersection import IntervalTree
 
 def hash():
-    return collections.defaultdict(hash)
+	return collections.defaultdict(hash)
 
 def convert_chromosome(name):
 	return re.sub("chr", "", name)
@@ -249,7 +249,7 @@ def remove_overlapping_transcripts(gtf, transcript_tracker):
 	#logger.info("Number of transcripts prior to sanitizing: ", str(count_transcripts(gtf)))
 	cleaned_gtf = hash()
 	count = 0
-	logger.info("(in remove_overlapping_transcipts) Sanitizing transcript database [STARTED].")
+	logger.info("(in remove_overlapping_transcripts) Sanitizing transcript database [STARTED].")
 	for gene_type in gtf:
 		for chr in gtf[gene_type]:
 			for strand in gtf[gene_type][chr]:
@@ -276,317 +276,212 @@ def remove_overlapping_transcripts(gtf, transcript_tracker):
 														cleaned_gtf[gene_type][chr][strand][gene][transcript] = gtf[gene_type][chr][strand][gene][transcript]
 														count += 1
 	#logger.info("Number of transcripts after sanitizing: ", str(count))
-	logger.info("(in remove_overlapping_transcipts) Sanitizing transcript database [COMPLETE].")
+	logger.info("(in remove_overlapping_transcripts) Sanitizing transcript database [COMPLETE].")
 	return cleaned_gtf
 
 class Alignment(object):
+	  '''
+	  This class takes as input a BAM alignment file, regional coordinates related to the
+	  5'UTR, CDS/exon, or 3'UTR of a transcript, and a set of offsets to adjust the 5'
+	  aligned position of the read to its A-site or P-site equivvalent (as protected by a
+	  ribosome). Read position adjustments are made according to the CIGAR string field of
+	  the alignment.
+	  '''
 
-	'''
-	This class object takes as input a BAM alignment file, and a set of offsets to adjust
-	the 5' aligned position of the read to its A-site or P-site equivalent as protected
-	by a ribosome. Read position adjustments are made according to the CIGAR string
-	field of the alignment file.
-	'''
+	  # CIGAR string operations:
+	  # M 0 alignment match (can be a sequence match or mismatch)
+	  # I 1 insertion to the reference
+	  # D 2 deletion from the reference
+	  # N 3 skipped region from the reference
+	  # S 4 soft clipping (clipped sequences present in SEQ)
+	  # H 5 hard clipping (clipped sequences NOT present in SEQ)
+	  # P 6 padding (silent deletion from padded reference)
+	  # = 7 sequence match
+	  # X 8 sequence mismatch
 
-	# CIGAR string operations:
-	# M 0 alignment match (can be a sequence match or mismatch)
-	# I 1 insertion to the reference
-	# D 2 deletion from the reference
-	# N 3 skipped region from the reference
-	# S 4 soft clipping (clipped sequences present in SEQ)
-	# H 5 hard clipping (clipped sequences NOT present in SEQ)
-	# P 6 padding (silent deletion from padded reference)
-	# = 7 sequence match
-	# X 8 sequence mismatch
+	  def __init__(self, bam_file, chr, strand, asite_buffers, psite_buffers, coordinates):
+			self.bam_file = bam_file
+			self.chr = chr
+			self.strand = strand
+			self.asite_buffers = asite_buffers
+			self.psite_buffers = psite_buffers
+			self.coordinates = coordinates
+			# Transcript coordinates will be of the format:
+			# [(start1, end1), (start2, end2), ...]
 
-	def __init__(self, bam_file):
-		self.bam_file = bam_file
-
-	def coverage(self):
-
-		def decode(flag):
+	  @staticmethod
+	  def decode(flag):
 			if int(flag) & 16:
-				return "-"
+				  return "-"
 			else:
-				return "+"
+				  return "+"
 
-		def calculate_offset(offsets, read_length):
-			if read_length in offsets:
-				return offsets[read_length]
-			else:
-				if len(set(offsets.values())) == 1:
-					# All Bazzini offset values are the same:
-					return offsets.values()[0]
-				else:
-					# Ingolia offsets are approximately half the read length:
-					return read_length / 2
+	  @staticmethod
+	  def transcript_length(coords):
+			length = 0
+			for start, end in coords:
+				  length += (end+1) - start
+			return length
 
-		def extract_coordinates_from_cigar(read_position, cigar):
-			# Return a list of expanded coordinates based on the read position and its CIGAR string:
-			coordinates = list()
-			ops = re.findall("[0-9]*[DHIMNPSX=]{1}", cigar)
-			for op in ops:
-				increment, modifier = int(op[:-1]), op[-1]
-				if not modifier == "N":
-					increments = range(increment)
-					for x in xrange(len(increments)):
-						coordinates.append(read_position + increments[x])
-				else:
-					position = coordinates[-1] + increment
+	  @staticmethod
+	  def transcript_coordinates(coords):
+			coordinates = []
+			for start, end in coords:
+				  region = range(start, end+1)
+				  for pos in region:
+						coordinates.append(pos)
 			return coordinates
 
-		def offset_read_position(pos, strand, length, cigar, offsets):
-			if strand == "+":
-				return extract_coordinates_from_cigar(pos, cigar)[calculate_offset(offsets, length)-1]
+	  @staticmethod
+	  def offset(read_position, read_strand, read_length, read_cigar, method):
+
+			def calculate_offset(offsets, length):
+				  if length in offsets:
+						return offsets[length]
+				  else:
+						if len(set(offsets.values())) == 1:
+							  # All Bazzini offset values are the same:
+							  return offsets.values()[0]
+						else:
+							  # Ingolia offsets are approximately half the read length:
+							  return length / 2
+
+			def extract_coordinates_from_cigar(pos, cigar):
+				  # Return a list of expanded coordinates based on the read position and its CIGAR string:
+				  coordinates = list()
+				  ops = re.findall("[0-9]*[DHIMNPSX=]{1}", cigar)
+				  for op in ops:
+						increment, modifier = int(op[:-1]), op[-1]
+						if not modifier == "N":
+							  increments = range(increment)
+							  for x in xrange(len(increments)):
+									coordinates.append(read_position + increments[x])
+						else:
+							  position = coordinates[-1] + increment
+				  return coordinates
+
+			offsets = {"ingolia": {26: 15, 27: 14, 28: 14, 30: 15, 31: 15}, "bazzini": {26: 12, 27: 12, 28: 12, 29: 12, 30: 12, 31: 12}}
+
+			if read_strand == "+":
+				  return extract_coordinates_from_cigar(read_position, read_cigar)[calculate_offset(offsets[method], read_length)-1]
 			else:
-				return extract_coordinates_from_cigar(pos, cigar)[-calculate_offset(offsets, length)]
+				  return extract_coordinates_from_cigar(read_position, read_cigar)[calculate_offset(offsets[method], read_length)]
 
-		offsets = {"ingolia": {26: 15, 27: 14, 28: 14, 30: 15, 31: 15}, "bazzini": {26: 12, 27: 12, 28: 12, 29: 12, 30: 12, 31: 12}}
+	  def asite_reads(self):
 
-		logger.info("(in Alignment_coverage) Loading BAM/SAM alignment file: " + self.bam_file + " into coverage [STARTED].")
-		# Load reads from BAM alignment file into a coverage IntervalTree() object:
-		coverage = dict()
-		reads = os.popen("samtools " + "view " + self.bam_file).readlines()
-		for read in reads:
-			sam = SAM(read)
-			# Convert SAM field values into required input formats for coverage functions:
-			strand = decode(sam.flag())
-			offset_position_a = offset_read_position(int(sam.pos()), strand, len(sam.seq()), sam.cigar(), offsets["ingolia"])
-			offset_position_p = offset_read_position(int(sam.pos()), strand, len(sam.seq()), sam.cigar(), offsets["bazzini"])
-			# Load the read into the IntervalTree():
-			tree = None
-			seq_id_a = sam.rname() + "a|" + strand
-			if seq_id_a in coverage:
-				tree = coverage[seq_id_a]
+	  		def regroup_coordinates(coords):
+	  			first = last = coords[0]
+	  			for n in coords[1:]:
+	  				if n-1 == last:
+	  					last = n
+	  				else:
+	  					yield first, last
+	  					first = last = n
+	  			yield first, last
+
+	  		read_lengths = dict()
+			asite_coordinates = self.transcript_coordinates(self.coordinates)
+			if self.strand == "+":
+				asite_coordinates = asite_coordinates[self.asite_buffers[0]:-self.asite_buffers[-1]]
 			else:
-				tree = IntervalTree()
-				coverage[seq_id_a] = tree
-			tree.add(offset_position_a, offset_position_a, read)
-			seq_id_p = sam.rname() + "p|" + strand
-			if seq_id_p in coverage:
-				tree = coverage[seq_id_p]
-			else:
-				tree = IntervalTree()
-				coverage[seq_id_p] = tree
-			tree.add(offset_position_p, offset_position_p, read)
-		logger.info("(in Alignment_coverage) Loading BAM/SAM alignment file: " + self.bam_file + " into coverage [COMPLETE].")
-		return coverage
+				asite_coordinates = asite_coordinates[self.asite_buffers[-1]:-self.asite_buffers[0]]
+			buffered_coordinates = regroup_coordinates(asite_coordinates)
+			for start, end in buffered_coordinates:
+				  reads = os.popen("samtools view " + self.bam_file + " " + self.chr + ":" + str(start) + "-" + str(end))
+				  for read in reads:
+						bam = SAM(read)
+						read_strand = self.decode(bam.flag())
+						if read_strand == self.strand:
+							  offset_position = self.offset(int(bam.pos()), read_strand, len(bam.seq()), bam.cigar(), "ingolia")
+							  if offset_position in range(start, end+1):
+									if len(bam.seq()) in read_lengths:
+										  read_lengths[len(bam.seq())] += 1
+									else:
+										  read_lengths[len(bam.seq())] = 1
+			return read_lengths
 
-class Coverage(object):
-
-	'''
-	Read coverage metrics over the range of a transcript.
-
-	Attributes:
-		chr: Chromosome ID in Ensembl format.
-		strand: The strand of the region to be tested.
-		coordinates: The coordinates over which to extract read coverage.
-		asite_buffer: Trimming buffer for transcript boundaries based on A-site position.
-		psite_buffer: Trimming buffer for transcript boundaries based on P-site position.
-		reads_tracker: An IntervalTree() coverage object extract from a BAM/SAM.
-	'''
-
-	def __init__(self, chr, strand, coordinates, asite_buffer, psite_buffer, reads_tracker):
-		self.chr = chr
-		self.strand = strand
-		self.coordinates = coordinates
-		self.asite_buffer = asite_buffer
-		self.psite_buffer = psite_buffer
-		self.reads_tracker = reads_tracker
-
-	def normalized_asite_coverage(self):
-		'''
-		There is a known bug/feature of the find() function in bx.intervals.intersection,
-		such that the boundaries of a given region are not included in the search, see
-		below code snippet for example:
-
-		from bx.intervals.intersection import Intersector, Interval
-		tree = Intersector()
-		tree.add_interval(Interval(1,10))
-		tree.find(1,1)
-		[]
-		tree.find(2,2)
-		[Interval(1,10)]
-
-		Thus, to find the single nucleotide position of reads that overlap a given position,
-		the find() function is to be implemented as follows:
-
-		tree.add_interval(Interval(1,1))
-		tree.add_interval(Interval(2,2))
-		tree.add_interval(Interval(3,3))
-		tree.find(0,2)
-		[Interval(1,1)]
-		tree.find(1,3)
-		[Interval(2,2)]
-		tree.find(2,4)
-		[Interval(3,3)]
-		'''
-		if not self.reads_tracker:
-			return "NA"
-		else:
-			region = list()
-			for coordinate in self.coordinates:
-				# Since Python indexes are 0-based:
-				start, end = int(coordinate[0]), int(coordinate[-1])+1
-				for position in range(start, end):
-					seq_id = self.chr + "a|" + self.strand
-					if seq_id in self.reads_tracker:
-						overlaps = list()
-						overlaps.extend(self.reads_tracker[seq_id].find(position-1, position+1))
-						region.append(len(overlaps))
-					else:
-						region.append(0)
-			if len(region) == 0:
+	  def normalized_asite_coverage(self):
+	  		normalized_coverage = list()
+			transcript_coverage = [0]*self.transcript_length(self.coordinates)
+			transcript_positions = self.transcript_coordinates(self.coordinates)
+			for start, end in self.coordinates:
+				  reads = os.popen("samtools view " + self.bam_file + " " + self.chr + ":" + str(start) + "-" + str(end))
+				  for read in reads:
+						bam = SAM(read)
+						read_strand = self.decode(bam.flag())
+						if read_strand == self.strand:
+							  offset_position = self.offset(int(bam.pos()), read_strand, len(bam.seq()), bam.cigar(), "ingolia")
+							  if offset_position in transcript_positions:
+									transcript_position = transcript_positions.index(offset_position)
+									transcript_coverage[transcript_position] += 1
+			if sum(transcript_coverage) == 0:
 				return "NA"
 			else:
-				if max(region) == 0:
+				for x in xrange(len(transcript_coverage)):
+					normalized_coverage.append(transcript_coverage[x]/float(max(transcript_coverage)))
+				return [normalized_coverage[::-1], normalized_coverage][self.strand == "+"]
+
+	  def psite_frame_reads(self):
+
+	  		def frame_reads(coverage, read_strand, psite_buffers):
+				frame_coverage = coverage[psite_buffers[0]:-psite_buffers[-1]]
+				if sum(frame_coverage) == 0:
 					return "NA"
 				else:
-					normalized_region = list()
-					for x in xrange(len(region)):
-						normalized_region.append(region[x]/float(max(region)))
-					return [normalized_region[::-1], normalized_region][self.strand == "+"]
-
-	def asite_reads(self):
-		'''
-		Given the chromosome, strand, coordinates, and the FLOSS-based regional buffer,
-		return the A-site reads over the designated region.
-		'''
-		if not(self.reads_tracker):
-			return "NA"
-		else:
-			reads = dict()
-			expanded_coordinates = sum([range(start, end+1) for start, end in self.coordinates], [])
-			# Trim the region according to the provided buffer:
-			if self.asite_buffer[0] == self.asite_buffer[1]:
-				if self.asite_buffer[0] == self.asite_buffer[1] == 0:
-					pass
-				else:
-					expanded_coordinates = expanded_coordinates[self.asite_buffer[0]-1:self.asite_buffer[1]]
-			else:
-				if self.asite_buffer[0] == 0:
-					if self.strand == "+":
-						expanded_coordinates = expanded_coordinates[0:self.asite_buffer[1]]
-					else:
-						expanded_coordinates = expanded_coordinates[self.asite_buffer[1]-1:]
-				else:
-					if self.strand == "+":
-						expanded_coordinates = expanded_coordinates[self.asite_buffer[0]-1:]
-					else:
-						expanded_coordinates = expanded_coordinates[0:self.asite_buffer[0]]
-			for position in expanded_coordinates:
-				seq_id = self.chr + "a|" + self.strand
-				if seq_id in self.reads_tracker:
-					overlaps = list()
-					overlaps.extend(self.reads_tracker[seq_id].find(position-1, position+1))
-					for read in overlaps:
-						read_length = len(read.split("\t")[9])
-						if read_length in reads:
-							reads[read_length] += 1
+					masked_region = list()
+					for x in xrange(len(frame_coverage)):
+						if frame_coverage[x]/math.fsum(frame_coverage) >= 0.7:
+							masked_region.append(0)
 						else:
-							reads[read_length] = 1
-			return reads
+							masked_region.append(frame_coverage[x])
+					if read_strand == "+":
+						reads = [sum(masked_region[i::3]) for i in (0,1,2)]
+					else:
+						reads = [sum(masked_region[::-1][i::3]) for i in (0,1,2)]
+					return reads
 
-	def psite_frames(self):
-		'''
-		Given the chromosome, strand, coordinates, and the ORFscore-based regional buffer,
-		return the P-site reads over the designated region.
-		'''
-		if not(self.reads_tracker):
-			return "NA"
-		else:
-			frames = list()
-			expanded_coordinates = sum([range(start, end+1) for start, end in self.coordinates], [])
-			# Trim the region according to the provided buffer:
-			if self.psite_buffer[0] == self.psite_buffer[1]:
-				if self.psite_buffer[0] == self.psite_buffer[1] == 0:
-					pass
-				else:
-					expanded_coordinates = expanded_coordinates[self.psite_buffer[0]-1:-self.psite_buffer[1]]
-			else:
-				if self.psite_buffer[0] == 0:
-					if self.strand == "+":
-						expanded_coordinates = expanded_coordinates[0:-self.psite_buffer[1]]
-					else:
-						expanded_coordinates = expanded_coordinates[self.psite_buffer[1]-1:]
-				else:
-					if self.strand == "+":
-						expanded_coordinates = expanded_coordinates[self.psite_buffer[0]-1:]
-					else:
-						expanded_coordinates = expanded_coordinates[0:-self.psite_buffer[0]]
-			# Collect the read depth over the trimmed coordinates:
-			region = list()
-			for position in expanded_coordinates:
-				seq_id = self.chr + "p|" + self.strand
-				if seq_id in self.reads_tracker:
-					overlaps = list()
-					overlaps.extend(self.reads_tracker[seq_id].find(position-1, position+1))
-					region.append(len(overlaps))
-				else:
-					region.append(0)
-			# Mask putative peaks in the transcript:
-			if sum(region) == 0:
-				frames = "NA"
-			else:
-				masked_region = list()
-				for x in xrange(len(region)):
-					if region[x]/math.fsum(region) >= 0.7:
-						masked_region.append(0)
-					else:
-						masked_region.append(region[x])
-				if self.strand == "+":
-					frames = [sum(masked_region[i::3]) for i in (0,1,2)]
-				else:
-					frames = [sum(masked_region[::-1][i::3]) for i in (0,1,2)]
-			return frames
+			transcript_coverage = [0]*self.transcript_length(self.coordinates)
+			transcript_coordinates = self.transcript_coordinates(self.coordinates)
+			for start, end in self.coordinates:
+				  reads = os.popen("samtools view " + self.bam_file + " " + self.chr + ":" + str(start) + "-" + str(end))
+				  for read in reads:
+						bam = SAM(read)
+						read_strand = self.decode(bam.flag())
+						if read_strand == self.strand:
+							  offset_position = self.offset(int(bam.pos()), read_strand, len(bam.seq()), bam.cigar(), "bazzini")
+							  if offset_position in transcript_coordinates:
+									transcript_position = transcript_coordinates.index(offset_position)
+									transcript_coverage[transcript_position] += 1
+			return frame_reads(transcript_coverage, self.strand, self.psite_buffers)
 
 class ORF(object):
 
-	def __init__(self, frame_reads):
-		self.frame_reads = frame_reads
+	def __init__(self, transcript_frame_reads):
+		self.transcript_frame_reads = transcript_frame_reads
 
 	def score(self):
 
 		def frame_score(reads, mean_reads):
 			return math.pow((reads - mean_reads), 2) / mean_reads
-		frames_mean = sum(self.frame_reads) / float(len(self.frame_reads))
-		orf_score = math.log(math.fsum([frame_score(self.frame_reads[0], frames_mean),
-										frame_score(self.frame_reads[1], frames_mean),
-										frame_score(self.frame_reads[2], frames_mean), 1]), 2)
-		if (self.frame_reads[0] > self.frame_reads[1]) and (self.frame_reads[0] > self.frame_reads[2]):
+
+		frames_mean = sum(self.transcript_frame_reads) / float(len(self.transcript_frame_reads))
+		orf_score = math.log(math.fsum([frame_score(self.transcript_frame_reads[0], frames_mean), frame_score(self.transcript_frame_reads[1], frames_mean), frame_score(self.transcript_frame_reads[2], frames_mean), 1]), 2)
+		if (self.transcript_frame_reads[0] > self.transcript_frame_reads[1]) and (self.transcript_frame_reads[0] > self.transcript_frame_reads[2]):
 			return orf_score
 		else:
 			return -orf_score
 
 class FLOSS(object):
 
-	def __init__(self, region_reads, reference_distribution):
-		self.region_reads = region_reads
+	def __init__(self, transcript_distribution, reference_distribution):
+		self.transcript_distribution = transcript_distribution
 		self.reference_distribution = reference_distribution
-
-	def distribution(self):
-		'''
-		Calculate the read length distribution over a region by summing the number of reads
-		of a given length contained in that region. Reads less than or equal to 26 nucleotides
-		in length are to be grouped together, and reads longer than or equal to 34 nucleotides
-		in length are to be grouped together.
-		'''
-		dist = {26: 0.0, 27: 0.0, 28: 0.0, 29: 0.0, 30: 0.0, 31: 0.0, 32: 0.0, 33: 0.0, 34: 0.0}
-		for read_length in self.region_reads:
-			if read_length <= 26:
-				dist[26] += self.region_reads[read_length]/float(sum(self.region_reads.values()))
-			elif read_length >= 34:
-				dist[34] += self.region_reads[read_length]/float(sum(self.region_reads.values()))
-			else:
-				dist[read_length] += self.region_reads[read_length]/float(sum(self.region_reads.values()))
-		return dist
 
 	def score(self):
 		floss = 0
-		transcript_distribution = self.distribution()
-		for read_length in transcript_distribution:
+		for read_length in self.transcript_distribution:
 			if read_length in self.reference_distribution:
-				floss += abs(transcript_distribution[read_length] - self.reference_distribution[read_length])
+				floss += abs(self.transcript_distribution[read_length] - self.reference_distribution[read_length])
 		return floss / 2.0
 
 class SPECtre(object):
@@ -657,48 +552,6 @@ class SPECtre(object):
 				else:
 					return math.fsum([sorted_signal[midpoint], sorted_signal[midpoint+1]]) / 2.0
 
-class Reference(object):
-
-	'''
-	Given a set of protein-coding transcripts, calculate the averaged read length distribution
-	for each transcript.
-	'''
-
-	def __init__(self, gtf, reads_tracker, buffers):
-		self.gtf = gtf
-		self.reads_tracker = reads_tracker
-		self.asite_buffers = asite_buffers
-
-	def distribution(self):
-		read = {26: 0, 27: 0, 28: 0, 29: 0, 30: 0, 31: 0, 32: 0, 33: 0, 34: 0}
-		transcript_count = 0.0
-		for chr in self.gtf:
-			for strand in self.gtf[chr]:
-				for gene in self.gtf[chr][strand]:
-					for transcript in self.gtf[chr][strand][gene]:
-						for feature in self.gtf[chr][strand][gene][transcript]:
-							if feature == "CDS":
-								region = Coverage(chr, strand, self.gtf[chr][strand][gene][transcript][feature], asite_buffers["CDS"], (0,0), self.reads_tracker)
-								if not region.asite_reads():
-									pass
-								else:
-									read[26] += sum(num for read_length, num in region.asite_reads().items() if read_length <= 26) / float(sum(region.asite_reads().values()))
-									read[27] += sum(num for read_length, num in region.asite_reads().items() if read_length == 27) / float(sum(region.asite_reads().values()))
-									read[28] += sum(num for read_length, num in region.asite_reads().items() if read_length == 28) / float(sum(region.asite_reads().values()))
-									read[29] += sum(num for read_length, num in region.asite_reads().items() if read_length == 29) / float(sum(region.asite_reads().values()))
-									read[30] += sum(num for read_length, num in region.asite_reads().items() if read_length == 30) / float(sum(region.asite_reads().values()))
-									read[31] += sum(num for read_length, num in region.asite_reads().items() if read_length == 31) / float(sum(region.asite_reads().values()))
-									read[32] += sum(num for read_length, num in region.asite_reads().items() if read_length == 32) / float(sum(region.asite_reads().values()))
-									read[33] += sum(num for read_length, num in region.asite_reads().items() if read_length == 33) / float(sum(region.asite_reads().values()))
-									read[34] += sum(num for read_length, num in region.asite_reads().items() if read_length >= 34) / float(sum(region.asite_reads().values()))
-									transcript_count += 1.0
-		if transcript_count == 0:
-			return read
-		else:			
-			for length in read:
-				read[length] /= transcript_count
-			return read
-
 class Checks(object):
 
 	def __init__(self, region, frame_reads, strand, length, buffers, fpkms, transcript):
@@ -752,6 +605,91 @@ class Checks(object):
 		else:
 			return False
 
+def calculate_transcript_scores(gtf, fpkms, asite_buffer, psite_buffer, bam_file, window_length, spectre_analysis, methods):
+
+	'''
+	For each transcript, this function is to calculate (if so designated) its SPECtre metrics
+	(score, and windowed coherence signal), FLOSS metrics (score, and read distribution), and
+	ORFscore metrics (score, and distribution of reads over each frame). If directed, the
+	SPECtre metrics over a given window length(s) will also be calculated.
+	'''
+
+	def add_to_reference_distribution(reference_dist, transcript_dist):
+		for read_length in transcript_dist:
+			reference_dist[read_length] += transcript_dist[read_length]
+		return reference_dist
+
+	def calculate_transcript_distribution(transcript_reads):
+		normalized_distribution = {26: 0, 27: 0, 28: 0, 29: 0, 30: 0, 31: 0, 32: 0, 33: 0, 34: 0}
+		total_reads = float(sum(transcript_reads.values()))
+		if total_reads == 0:
+			return normalized_distribution
+		else:
+			for read_length in transcript_reads:
+				if read_length <= 26:
+					normalized_distribution[26] += transcript_reads[read_length]
+				elif read_length >= 34:
+					normalized_distribution[34] += transcript_reads[read_length]
+				else:
+					normalized_distribution[read_length] += transcript_reads[read_length]
+			for read_length in normalized_distribution:
+				normalized_distribution[read_length] /= total_reads
+			return normalized_distribution
+
+	logger.info("(in calculate_transcript_scores) Calculating transcript-level metrics [STARTED].")
+	reference_distribution = {26: 0, 27: 0, 28: 0, 29: 0, 30: 0, 31: 0, 32: 0, 33: 0, 34: 0}
+	transcript_count = 0
+	scores = dict()
+	for gene_type in gtf:
+		for chr in gtf[gene_type]:
+			for strand in gtf[gene_type][chr]:
+				for gene in gtf[gene_type][chr][strand]:
+					for transcript in gtf[gene_type][chr][strand][gene]:
+						for feature in gtf[gene_type][chr][strand][gene][transcript]:
+							if feature in ("CDS", "exon"):
+								region = Alignment(bam_file, chr, strand, asite_buffer["CDS"], psite_buffer["CDS"], gtf[gene_type][chr][strand][gene][transcript][feature])
+								check = Checks(region.normalized_asite_coverage(), region.psite_frame_reads(), strand, window_length, (asite_buffer["CDS"], psite_buffer["CDS"]), fpkms, transcript)
+							else:
+								region = Alignment(bam_file, chr, strand, asite_buffer["UTR"], psite_buffer["UTR"], gtf[gene_type][chr][strand][gene][transcript][feature])
+								check = Checks(region.normalized_asite_coverage(), region.psite_frame_reads(), strand, window_length, (asite_buffer["UTR"], psite_buffer["UTR"]), fpkms, transcript)
+							if (check.trimming() == True) and (check.coverage() == True) and (check.frames() == True) and (check.fpkm() == True):
+								# Calculate SPECtre using given window length:
+								window_spectre = SPECtre(region.normalized_asite_coverage(), window_length, spectre_analysis)
+								if gene_type in scores:
+									if chr in scores[gene_type]:
+										if strand in scores[gene_type][chr]:
+											if gene in scores[gene_type][chr][strand]:
+												if transcript in scores[gene_type][chr][strand][gene]:
+													if feature not in scores[gene_type][chr][strand][gene][transcript]:
+														scores[gene_type][chr][strand][gene][transcript][feature] = {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}
+												else:
+													scores[gene_type][chr][strand][gene][transcript] = {feature: {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}}
+											else:
+												scores[gene_type][chr][strand][gene] = {transcript: {feature: {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}}}
+										else:
+											scores[gene_type][chr][strand] = {gene: {transcript: {feature: {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}}}}
+									else:
+										scores[gene_type][chr] = {strand: {gene: {transcript: {feature: {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}}}}}
+								else:
+									scores[gene_type] = {chr: {strand: {gene: {transcript: {feature: {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}}}}}}
+								if "Full" in methods:
+									full_spectre = SPECtre(region.normalized_asite_coverage(), 0, spectre_analysis)
+									scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["score_full"] = full_spectre.score()
+									scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["coherences_full"] = full_spectre.signal()
+								if "FLOSS" in methods:
+									scores[gene_type][chr][strand][gene][transcript][feature]["FLOSS"] = {"score": 0 , "distribution": calculate_transcript_distribution(region.asite_reads())}
+									reference_distribution = add_to_reference_distribution(reference_distribution, calculate_transcript_distribution(region.asite_reads()))
+									if not sum(scores[gene_type][chr][strand][gene][transcript][feature]["FLOSS"]["distribution"]) == 0:
+										transcript_count += 1
+								if "ORFscore" in methods:
+									orf = ORF(region.psite_frame_reads())
+									scores[gene_type][chr][strand][gene][transcript][feature]["ORF"] = {"score": orf.score(), "distribution": region.psite_frame_reads()}
+	for read_length in reference_distribution:
+		reference_distribution[read_length] /= float(transcript_count)
+	logger.info("(in calculate_transcript_scores) Calculating transcript-level metrics [COMPLETE].")
+	return scores, reference_distribution
+
+
 def build_translated_distributions(transcript_scores, transcript_fpkms, fpkm_cutoff, analysis):
 	translated_scores = list()
 	untranslated_scores = list()
@@ -763,16 +701,15 @@ def build_translated_distributions(transcript_scores, transcript_fpkms, fpkm_cut
 						for transcript in transcript_scores[gene_type][chr][strand][gene]:
 							for feature in transcript_scores[gene_type][chr][strand][gene][transcript]:
 								if feature == "CDS":
-									if analysis == "SPEC":
-										if "SPEC" in transcript_scores[gene_type][chr][strand][gene][transcript][feature]:
+									if analysis in ("SPEC", "Full"):
+										if analysis == "SPEC":
 											if "score_windowed" in transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]:
 												if transcript in transcript_fpkms:
 													if transcript_fpkms[transcript] >= float(fpkm_cutoff):
 														translated_scores.append(transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["score_windowed"])
 													else:
 														untranslated_scores.append(transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["score_windowed"])
-									elif analysis == "Full":
-										if "SPEC" in transcript_scores[gene_type][chr][strand][gene][transcript][feature]:
+										elif analysis == "Full":
 											if "score_full" in transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]:
 												if transcript in transcript_fpkms:
 													if transcript_fpkms[transcript] >= float(fpkm_cutoff):
@@ -788,67 +725,13 @@ def build_translated_distributions(transcript_scores, transcript_fpkms, fpkm_cut
 													untranslated_scores.append(transcript_scores[gene_type][chr][strand][gene][transcript][feature][analysis]["score"])
 	return translated_scores, untranslated_scores
 
-def calculate_transcript_metrics(gtf, fpkms, asite_buffer, psite_buffer, reads_tracker, cutoff, window_length, reference_distribution, spectre_analysis, methods):
+def calculate_transcript_metrics(transcript_scores, fpkms, asite_buffer, psite_buffer, reference_distribution, cutoff, window_length, spectre_analysis, methods):
 
-	'''
-	For each transcript, this function is to calculate (if so designated) its SPECtre metrics
-	(score, and windowed coherence signal), FLOSS metrics (score, and read distribution), and
-	ORFscore metrics (score, and distribution of reads over each frame). If directed, the
-	SPECtre metrics over a given window length(s) will also be calculated.
-	'''
-
-	def calculate_transcript_scores(gtf, fpkms, asite_buffer, psite_buffer, reads_tracker, window_length, reference_distribution, spectre_analsyis, methods):
-		logger.info("(in calculate_transcript_scores) Calculating transcript-level metrics [STARTED].")
-		scores = dict()
-		for gene_type in gtf:
-			for chr in gtf[gene_type]:
-				for strand in gtf[gene_type][chr]:
-					for gene in gtf[gene_type][chr][strand]:
-						for transcript in gtf[gene_type][chr][strand][gene]:
-							for feature in gtf[gene_type][chr][strand][gene][transcript]:
-								if feature in ("CDS", "exon"):
-									region = Coverage(chr, strand, gtf[gene_type][chr][strand][gene][transcript][feature], asite_buffer["CDS"], psite_buffer["CDS"], reads_tracker)
-									check = Checks(region.normalized_asite_coverage(), region.psite_frames(), strand, window_length, (asite_buffer["CDS"], psite_buffer["CDS"]), fpkms, transcript)
-								else:
-									region = Coverage(chr, strand, gtf[gene_type][chr][strand][gene][transcript][feature], asite_buffer["UTR"], psite_buffer["UTR"], reads_tracker)
-									check = Checks(region.normalized_asite_coverage(), region.psite_frames(), strand, window_length, (asite_buffer["UTR"], psite_buffer["UTR"]), fpkms, transcript)
-								if (check.trimming() == True) and (check.coverage() == True) and (check.frames() == True) and (check.fpkm() == True):
-									# Calculate SPECtre using given window length:
-									window_spectre = SPECtre(region.normalized_asite_coverage(), window_length, spectre_analysis)
-									if gene_type in scores:
-										if chr in scores[gene_type]:
-											if strand in scores[gene_type][chr]:
-												if gene in scores[gene_type][chr][strand]:
-													if transcript in scores[gene_type][chr][strand][gene]:
-														if feature not in scores[gene_type][chr][strand][gene][transcript]:
-															scores[gene_type][chr][strand][gene][transcript][feature] = {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}
-													else:
-														scores[gene_type][chr][strand][gene][transcript] = {feature: {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}}
-												else:
-													scores[gene_type][chr][strand][gene] = {transcript: {feature: {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}}}
-											else:
-												scores[gene_type][chr][strand] = {gene: {transcript: {feature: {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}}}}
-										else:
-											scores[gene_type][chr] = {strand: {gene: {transcript: {feature: {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}}}}}
-									else:
-										scores[gene_type] = {chr: {strand: {gene: {transcript: {feature: {"SPEC": {"score_windowed": window_spectre.score(), "coherences_windowed": window_spectre.signal()}}}}}}}
-									if "Full" in methods:
-										full_spectre = SPECtre(region.normalized_asite_coverage(), 0, spectre_analysis)
-										scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["score_full"] = full_spectre.score()
-										scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["coherences_full"] = full_spectre.signal()
-									if "FLOSS" in methods:
-										floss = FLOSS(region.asite_reads(), reference_distribution)
-										scores[gene_type][chr][strand][gene][transcript][feature]["FLOSS"] = {"score": floss.score(), "distribution": floss.distribution()}
-									if "ORFscore" in methods:
-										orf = ORF(region.psite_frames())
-										scores[gene_type][chr][strand][gene][transcript][feature]["ORF"] = {"score": orf.score(), "distribution": region.psite_frames()}
-		logger.info("(in calculate_transcript_scores) Calculating transcript-level metrics [COMPLETE].")
-		return scores
-
-# CHANGE SO THAT SPEC SCORE OF 0.0 RESULTS IN POSTERIOR PROBABILITY OF 0.0 ALSO!!!
 	def posterior_probability(score, coding_scores, noncoding_scores):
 		if score > max(coding_scores):
 			return 1.0
+		elif score == 0:
+			return 0.0
 		else:
 			prob_score_coding = len([n for n in coding_scores if n >= score])/float(len(coding_scores))
 			prob_coding = len(coding_scores)/float(len(coding_scores)+len(noncoding_scores))
@@ -862,7 +745,6 @@ def calculate_transcript_metrics(gtf, fpkms, asite_buffer, psite_buffer, reads_t
 		return windowed
 
 	logger.info("(in calculate_transcript_metrics) Calculating transcript-level posterior probabilites [STARTED].")
-	transcript_scores = calculate_transcript_scores(gtf, fpkms, asite_buffer, psite_buffer, reads_tracker, window_length, reference_distribution, spectre_analysis, methods)
 	translated_scores, untranslated_scores = build_translated_distributions(transcript_scores, fpkms, cutoff, "SPEC")
 	for gene_type in transcript_scores:
 		for chr in transcript_scores[gene_type]:
@@ -875,9 +757,13 @@ def calculate_transcript_metrics(gtf, fpkms, asite_buffer, psite_buffer, reads_t
 									if "coherences_windowed" in transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]:
 										transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["score_posterior"] = posterior_probability(transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["score_windowed"], translated_scores, untranslated_scores)
 										transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["coherences_posterior"] = windowed_posterior_probability(transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["coherences_windowed"], translated_scores, untranslated_scores)
-										if "Full" in methods:
-											translated_scores, untranlsated_scores = build_translated_distributions(transcript_scores, fpkms, cutoff, "Full")
-											transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["score_full_posterior"] = posterior_probability(transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["score_full"], translated_scores, untranslated_scores)
+										#if "Full" in methods:
+										#	translated_scores, untranlsated_scores = build_translated_distributions(transcript_scores, fpkms, cutoff, "Full")
+										#	transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["score_full_posterior"] = posterior_probability(transcript_scores[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["score_full"], translated_scores, untranslated_scores)
+							if "FLOSS" in methods and "FLOSS" in transcript_scores[gene_type][chr][strand][gene][transcript][feature]:
+								if "distribution" in transcript_scores[gene_type][chr][strand][gene][transcript][feature]["FLOSS"]:
+									floss = FLOSS(transcript_scores[gene_type][chr][strand][gene][transcript][feature]["FLOSS"]["distribution"], reference_distribution)
+									transcript_scores[gene_type][chr][strand][gene][transcript][feature]["FLOSS"]["score"] = floss.score()
 	logger.info("(in calculate_transcript_metrics) Calculating transcript-level posterior probabilites [COMPLETE].")
 	return transcript_scores
 
@@ -1000,7 +886,7 @@ def print_metrics(output_file, transcript_stats, experiment_stats, gtf, fpkms, a
 			if analysis == "SPECtre":
 				return format_windowed(stats[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["coherences_windowed"]) + "\t" + format_windowed(stats[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["coherences_posterior"])
 			elif analysis == "Full":
-				return format_windowed(stats[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["coherences_full"])
+				return format_windowed(stats[gene_type][chr][strand][gene][transcript][feature]["SPEC"]["coherences_full"]) + "\tNA"
 			elif analysis == "FLOSS":
 				return format_distribution(stats[gene_type][chr][strand][gene][transcript][feature]["FLOSS"]["distribution"])
 			elif analysis == "ORFscore":
@@ -1085,19 +971,19 @@ def print_metrics(output_file, transcript_stats, experiment_stats, gtf, fpkms, a
 										for feature in ("UTR5", "CDS", "UTR3"):
 											line += "\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, feature, analysis)
 									else:
-										line += "\tNA\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA"
+										line += "\tNA\tNA\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA\tNA"
 									if verbose_check == True:
 										if gene_type == "protein_coding":
 											for feature in ("UTR5", "CDS", "UTR3"):
 												line += "\t" + return_extras(transcript_stats, gene_type, chr, strand, gene, transcript, feature, analysis)
 										else:
-											line += "\tNA\t" + return_extras(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA"
+											line += "\tNA\tNA\t" + return_extras(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA\tNA"
 								else:
 									if gene_type == "protein_coding":
 										for feature in ("UTR5", "CDS", "UTR3"):
 											line += "\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, feature, analysis)
 									else:
-										line += "\tNA\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA"
+										line += "\tNA\tNA\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA\tNA"
 						else:
 							for analysis in analyses:
 								if analysis in ("SPECtre", "Full"):
@@ -1111,7 +997,7 @@ def print_metrics(output_file, transcript_stats, experiment_stats, gtf, fpkms, a
 										for feature in ("UTR5", "CDS", "UTR3"):
 											line += "\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, feature, analysis)
 									else:
-										line += "\tNA\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA"
+										line += "\tNA\tNA\t" + return_metric(transcript_stats, gene_type, chr, strand, gene, transcript, "exon", analysis) + "\tNA\tNA"
 						output_file.write("\n" + line)
 						count += 1
 
@@ -1128,7 +1014,7 @@ if __name__ == "__main__":
 	parser.add_argument("--discovery", action="store_true", default="store_false", help="enable discovery mode, see README for details")
 	spectre_args = parser.add_argument_group("parameters for SPECtre analysis:")
 	spectre_args.add_argument("--len", action="store", required=False, nargs="?", default=30, metavar="INT", help="length of sliding window (default: %(default)s)")
-	spectre_args.add_argument("--min", action="store", required=False, nargs="?", default=5, metavar="FLOAT", help="minimum FPKM for active translation (default: %(default)s FPKM)")
+	spectre_args.add_argument("--min", action="store", required=False, nargs="?", default=3, metavar="FLOAT", help="minimum FPKM for active translation (default: %(default)s FPKM)")
 	spectre_args.add_argument("--fdr", action="store", required=False, nargs="?", default=0.05, metavar="FLOAT", help="FDR cutoff (default: %(default)s)")
 	spectre_args.add_argument("--type", action="store", required=False, nargs="?", default="median", metavar="TYPE", choices=["mean","median","max","nonzero_mean","nonzero_median"], help="metric for SPECtre analysis (choices: mean,[median],max,nonzero_mean,nonzero_median)")
 	file_args = parser.add_argument_group("required input and output parameters:")
@@ -1176,25 +1062,18 @@ if __name__ == "__main__":
 	analyses = ["SPECtre"]
 	if args.full == True:
 		analyses.append("Full")
-
-	# Convert the aligned reads from the provided BAM/SAM file into an IntervalTree()
-	# coverage object. To consolidate coverage for both A-site and P-site read coverage
-	# the adjusted alignments will be computed simultaneously.
-	offset_reads = Alignment(args.input)
-
-	# Calculate the reference read distribution for FLOSS metric calculation:
-	reference_reads = Reference(transcript_gtf["protein_coding"], offset_reads.coverage(), asite_buffers)
-
 	if args.floss == True:
 		analyses.append("FLOSS")
 	if args.orfscore == True:
 		analyses.append("ORFscore")
 
-	# Perform a first-pass analysis of each transcript, including: SPECtre score (over each
-	# designated window length), SPECtre transcript codon signal (for each window length
-	# specified), FLOSS metric and read distribution (if required), and ORFscore metric and reading frame
-	# distribution (if required).
-	transcript_metrics = calculate_transcript_metrics(transcript_gtf, transcript_fpkms, asite_buffers, psite_buffers, offset_reads.coverage(), args.min, args.len, reference_reads.distribution(), args.type, analyses)
+	# Calculate the designated transcript-level scores based on the analyses to be conducted
+	# and calculate the reference read distribution for FLOSS analysis (if necessary):
+	transcript_scores, reference_floss_distribution = calculate_transcript_scores(transcript_gtf, transcript_fpkms, asite_buffers, psite_buffers, args.input, args.len, args.type, analyses)
+
+	# Perform a second-pass analysis to complete transcript-level metrics, including the final
+	# FLOSS metric (if required):
+	transcript_metrics = calculate_transcript_metrics(transcript_scores, transcript_fpkms, asite_buffers, psite_buffers, reference_floss_distribution, args.min, args.len, args.type, analyses)
 
 	# Perform a second-pass global analysis based on the transcript-level metrics, such as:
 	# ROC analyses, posterior probability as a function of empirical FDR, and codon window
