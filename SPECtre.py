@@ -361,7 +361,7 @@ def parse_gtf(gtf_file, fpkms, window_length, buffers, sanitize):
 		if not line.startswith("#"):
 			seq_name, source, feature, start, end, score, strand, frame, attributes = line.strip().split("\t")
 			seq_name = convert_chromosome(seq_name)
-			gene_type = re.findall("gene_biotype .*;{1}", attributes)[0].split('"')[1]
+			gene_type = re.findall("gene_type|biotype .*;{1}", attributes)[0].split('"')[1]
 			# Parse annotated protein-coding CDS into the GTF dictionary:
 			if (gene_type == "protein_coding" and feature in ("CDS", "UTR")) or (gene_type != "protein_coding" and feature == "exon"):
 				gene, transcript = re.findall('ENS[A-Z]*G[0-9]*', attributes)[0], re.findall('ENS[A-Z]*T[0-9]*', attributes)[0]
