@@ -364,7 +364,7 @@ def parse_gtf(gtf_file, fpkms, window_length, buffers, sanitize):
 			gene_type = re.findall("gene_[a-z]{0,3}type .*;{1}", attributes)[0].split('"')[1]
 			# Parse annotated protein-coding CDS into the GTF dictionary:
 			if (gene_type == "protein_coding" and feature in ("CDS", "UTR")) or (gene_type != "protein_coding" and feature == "exon"):
-				gene, transcript = re.findall('ENS[A-Z]*G[0-9]*', attributes)[0], re.findall('ENS[A-Z]*T[0-9]*', attributes)[0]
+				gene, transcript = re.findall('gene_id "ENS[A-Z]*.*";{1}', attributes)[0].split('"')[1], re.findall('transcript_id "ENS[A-Z]*.*";{1}', attributes)[0].split('"')[1]
 				if isinstance(transcripts[gene_type][seq_name][strand][gene][transcript][feature], list):
 					transcripts[gene_type][seq_name][strand][gene][transcript][feature].append((int(start), int(end)))
 				else:
@@ -769,7 +769,7 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffer, psite_buf
 			transcripts[gene_type][chrom][strand][gene][transcript][feature][metric] = score
 		return transcripts
 
-	logger.info("calculate_transcript_scores/main()/main(): Calculating transcript-level metrics [STARTED].")
+	logger.info("calculate_transcript_scores/main(): Calculating transcript-level metrics [STARTED].")
 	#########################################################################
 	# PREPARE TRANSCRIPTS AND SCORING HASHES FOR MULTI-THREADED PROCESSING: #
 	#########################################################################
@@ -778,7 +778,7 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffer, psite_buf
 	# Parse the transcript annotations and coordinates into separate lists:
 	transcripts, coordinates = zip(*flatten(gtf).iteritems())
 
-	logger.info("calculate_transcript_scores/main()/main(): Calculating A-site and P-site read distribution and coverage... [STARTED].")
+	logger.info("calculate_transcript_scores/main(): Calculating A-site and P-site read distribution and coverage... [STARTED].")
 	###########################################################################################
 	# CALCULATE THE A-SITE COVERAGE AND READ DISTRIBUTION, AND P-SITE READING FRAME COVERAGE: #
 	###########################################################################################
