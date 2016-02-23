@@ -64,7 +64,10 @@ def check_chrom_prefix(bam_file):
 	return has_prefix
 
 def convert_chromosome(name):
-	return re.sub("chr", "", name)
+	if "chr" in name:
+		return name
+	else:
+		return "chr" + name
 
 def decode(flag):
 	if int(flag) & 16:
@@ -216,7 +219,7 @@ def extract_fpkms(cufflinks):
 	logger.info("extract_fpkms(): Parsing transcript FPKMs from file: " + cufflinks + " into memory... [COMPLETE]")
 	return fpkms
 
-def parse_gtf(gtf_file, fpkms, window_length, buffers, sanitize):
+def parse_gtf(gtf_file, fpkms, window_length, buffers, prefix, sanitize):
 	# This function takes as input a user-supplied GTF transcript annotation file,
 	# and extracts the CDS and UTR coordinates of protein-coding genes, and start
 	# and end coordinates for non-coding transcripts then loads then into a dict().
@@ -369,7 +372,8 @@ def parse_gtf(gtf_file, fpkms, window_length, buffers, sanitize):
 	for line in open(gtf_file):
 		if not line.startswith("#"):
 			seq_name, source, feature, start, end, score, strand, frame, attributes = line.strip().split("\t")
-			#seq_name = convert_chromosome(seq_name)
+			if prefix == True:
+				seq_name = convert_chromosome(seq_name)
 			gene_type = re.findall("gene_[a-z]{0,3}type .*;{1}", attributes)[0].split('"')[1]
 			# Parse annotated protein-coding CDS into the GTF dictionary:
 			if (gene_type == "protein_coding" and feature in ("CDS", "UTR")) or (gene_type != "protein_coding" and feature == "exon"):
@@ -387,7 +391,7 @@ def parse_gtf(gtf_file, fpkms, window_length, buffers, sanitize):
 ############################
 # READ COVERAGE EXTRACTION #
 ############################
-def extract_read_coverage(bam_file, asite_buffers, psite_buffers, prefix, annotation_coordinates):
+def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coordinates):
 	def extract_asite_reads(bam_file, asite_buffers, prefix, annotation_coordinates):
 		# This function takes as input a tuple of transcript annotation information and its
 		# coordinates, and outputs the A-site adjusted reads within those coordinates organized
@@ -433,8 +437,6 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, prefix, annota
 			else:
 				asite_coordinates = asite_coordinates[asite_buffers[feature][-1]:-asite_buffers[feature][0]]
 			buffered_coordinates = regroup_coordinates(asite_coordinates)
-			if prefix == True:
-				chrom = "chr" + chrom
 			for start, end in buffered_coordinates:
 				reads = os.popen("samtools view " + bam_file + " " + chrom + ":" + str(start) + "-" + str(end))
 				for read in reads:
@@ -455,7 +457,7 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, prefix, annota
 		else:
 			return "NA"
 
-	def extract_asite_coverage(bam_file, asite_buffers, prefix, annotation_coordinates):
+	def extract_asite_coverage(bam_file, asite_buffers, annotation_coordinates):
 		# This function takes as input a BAM alignment file, A-site regional boundary buffers, and an
 		# annotation_coordinates() object that defines a transcript and its constituent coordinates.
 		# The transcript is de-limited into: gene_type, chromosome, strand, gene, transcrip and feature
@@ -469,8 +471,6 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, prefix, annota
 		transcript_coverage = [0]*transcript_length(coordinates)
 		# Extract the coordinates into a list():
 		transcript_positions = transcript_coordinates(coordinates)
-		if prefix == True:
-			chrom = "chr" + chrom
 		for start, end in coordinates:
 			reads = os.popen("samtools view " + bam_file + " " + chrom + ":" + str(start) + "-" + str(end))
 			for read in reads:
@@ -489,7 +489,7 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, prefix, annota
 				normalized_coverage.append(transcript_coverage[x]/float(max(transcript_coverage)))
 			return [normalized_coverage[::-1], normalized_coverage][strand == "+"]
 
-	def extract_psite_reads(bam_file, psite_buffers, prefix, annotation_coordinates):
+	def extract_psite_reads(bam_file, psite_buffers, annotation_coordinates):
 		# This function takes as input a BAM alignment file, P-site regional boundary buffers, and an
 		# annotation_coordinates() object that defines a transcripts and its constituent coordinates.
 		# The transcript is delimited into: gene_type, chromosome, strand, gene, transcript, and feature
@@ -522,8 +522,6 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, prefix, annota
 			feature = "CDS"
 		transcript_coverage = [0]*transcript_length(coordinates)
 		transcript_coords = transcript_coordinates(coordinates)
-		if prefix == True:
-			chrom = "chr" + chrom
 		for start, end in coordinates:
 			reads = os.popen("samtools view " + bam_file + " " + chrom + ":" + str(start) + "-" + str(end))
 			for read in reads:
@@ -1224,9 +1222,10 @@ if __name__ == "__main__":
 	asite_buffers = {"CDS": (45,15), "UTR": (15,15)}
 	psite_buffers = {"CDS": (3,3), "UTR": (3,3)}
 
+	chr_prefix = check_chrom_prefix(args.input)
 	# Extract transcripts, transcript intervals and expression using the provided GTF:
 	transcript_fpkms = extract_fpkms(args.fpkm)
-	transcript_gtf = parse_gtf(args.gtf, transcript_fpkms, int(args.len), asite_buffers.values() + psite_buffers.values(), args.sanitize)
+	transcript_gtf = parse_gtf(args.gtf, transcript_fpkms, int(args.len), asite_buffers.values() + psite_buffers.values(), chr_prefix, args.sanitize)
 
 	# Initialize the types of analyses to be conducted (default: SPECtre):
 	analyses = ["SPECtre"]
@@ -1237,9 +1236,8 @@ if __name__ == "__main__":
 	if args.orfscore == True:
 		analyses.append("ORFscore")
 
-	chr_prefix = check_chrom_prefix(args.input)
 	# Calculate the designated transcript-level scores based on the analyses to be conducted:
-	transcript_metrics, reference_read_distribution = calculate_transcript_scores(transcript_gtf, transcript_fpkms, float(args.min), asite_buffers, psite_buffers, args.input, int(args.len), int(args.step), args.type, analyses, int(args.nt), chr_prefix)
+	transcript_metrics, reference_read_distribution = calculate_transcript_scores(transcript_gtf, transcript_fpkms, float(args.min), asite_buffers, psite_buffers, args.input, int(args.len), int(args.step), args.type, analyses, int(args.nt))
 	
 	# Perform a second-pass global analysis based on the transcript-level metrics, such as:
 	# ROC analyses, posterior probability as a function of empirical FDR, and codon window
