@@ -796,7 +796,7 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffer, psite_buf
 	# CALCULATE THE A-SITE COVERAGE AND READ DISTRIBUTION, AND P-SITE READING FRAME COVERAGE: #
 	###########################################################################################
 	# Instantiate the partial parameters to the Coverage() class:
-	Coverage_func = partial(extract_read_coverage, bam_file, asite_buffer, psite_buffer, prefix)
+	Coverage_func = partial(extract_read_coverage, bam_file, asite_buffer, psite_buffer)
 	# Calculate the A-site coverage and read distribution, and P-site reading frame coverage, where
 	coverages = pool.map(Coverage_func, flatten(gtf).iteritems()) # Result is a list of Coverage() objects for each transcript.
 	# Partition coverage metrics to their respective containers:
