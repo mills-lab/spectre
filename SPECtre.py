@@ -392,7 +392,7 @@ def parse_gtf(gtf_file, fpkms, window_length, buffers, prefix, sanitize):
 # READ COVERAGE EXTRACTION #
 ############################
 def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coordinates):
-	def extract_asite_reads(bam_file, asite_buffers, prefix, annotation_coordinates):
+	def extract_asite_reads(bam_file, asite_buffers, annotation_coordinates):
 		# This function takes as input a tuple of transcript annotation information and its
 		# coordinates, and outputs the A-site adjusted reads within those coordinates organized
 		# by read length. Other primary inputs include a BAM alignment file, and a pre-defined	
