@@ -705,7 +705,7 @@ class ORF(object):
 #######################################################
 # FINAL TRANSCRIPT SCORE CALCULATIONS AND AGGREGATION #
 #######################################################
-def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffer, psite_buffer, bam_file, window_length, step_size, spectre_analysis, methods, threads, prefix):
+def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffer, psite_buffer, bam_file, window_length, step_size, spectre_analysis, methods, threads):
 
 	'''
 	For each transcript, this function is to calculate (if so designated) its SPECtre metrics
