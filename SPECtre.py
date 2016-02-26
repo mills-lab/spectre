@@ -19,6 +19,7 @@
 
 # DEPENDENCIES:
 # bx-python:	https://bitbucket.org/james_taylor/bx-python/wiki/Home
+# pyfasta:		https://pypi.python.org/pypi/pyfasta/
 # rpy:			http://rpy.sourceforge.net/
 # ROCR (in R)	https://rocr.bioinf.mpi-sb.mpg.de/
 
@@ -31,6 +32,7 @@ import argparse
 import itertools
 import collections
 
+from pyfasta import Fasta
 from bx.intervals.intersection import IntervalTree
 
 from functools import partial
@@ -88,6 +90,22 @@ def transcript_coordinates(coords):
 		for pos in region:
 			coordinates.append(pos)
 	return coordinates
+
+def regroup_coordinates(coords):
+	first = last = coords[0]
+	for n in coords[1:]:
+		if n-1 == last:
+			last = n
+		else:
+			yield first, last
+			first = last = n
+	yield first, last
+
+def extract_fasta_sequence(chrom, strand, coordinates, fasta):
+	seq = str()
+	for start, end in coordinates:
+		seq += fasta.sequence({"chr": chrom, "start": int(start), "stop": int(end), "strand": strand})
+	return seq
 
 def calculate_offset_position(read_position, read_strand, read_length, read_cigar, method):
 	# This function takes as input the 5' position of a read, the read length, strand and calculates
@@ -219,7 +237,7 @@ def extract_fpkms(cufflinks):
 	logger.info("extract_fpkms(): Parsing transcript FPKMs from file: " + cufflinks + " into memory... [COMPLETE]")
 	return fpkms
 
-def parse_gtf(gtf_file, fpkms, window_length, buffers, prefix, sanitize):
+def parse_gtf(gtf_file, genome_fasta, fpkms, window_length, buffers, prefix, add_uORFs, sanitize):
 	# This function takes as input a user-supplied GTF transcript annotation file,
 	# and extracts the CDS and UTR coordinates of protein-coding genes, and start
 	# and end coordinates for non-coding transcripts then loads then into a dict().
@@ -291,6 +309,56 @@ def parse_gtf(gtf_file, fpkms, window_length, buffers, prefix, sanitize):
 		logger.info("parse_gtf/interval_tree(): Parsing transcript intervals from GTF into an IntervalTree()... [COMPLETE]")
 		return intervals
 
+	def add_upstream_ORFs(gtf, fasta):
+		def define_orfs(five_prime_seq, cds_seq):
+			# This function will take as input the 5'UTR, CDS and 3'UTR sequences of a transcript and
+			# return all cognate-initiated uORFs as a list of tuples formatted as: [(uORF_sequence,
+			# start_position_in_UTR5, stop_position_in_CDS)]. Un-terminated uORFs will not be included
+			# in the final output.
+			cognates = re.finditer("[ACGT]TG", five_prime_seq)
+			positions = [site.start() for site in cognates]
+			transcript_seq = five_prime_seq + cds_seq
+			stops = ["TAA", "TGA", "TAG"]
+			orfs = list()
+			for tss in positions:
+				sub_seq = transcript_seq[tss:]
+				for i in xrange(0, len(sub_seq), 3):
+					orf = str()
+					codon = sub_seq[i:i+3]
+					if codon in stops:
+						orf = sub_seq[:i+3]
+						break
+				if len(orf) > 0:
+					orfs.append((orf, tss, tss+i+3))
+			return orfs
+
+		logger.info("parse_gtf/add_upstream_ORFs(): Extracting uORF coordinates from protein-coding transcripts... [STARTED]")
+		for chrom in gtf["protein_coding"]:
+			for strand in gtf["protein_coding"][chrom]:
+				for gene in gtf["protein_coding"][chrom][strand]:
+					for transcript in gtf["protein_coding"][chrom][strand][gene]:
+						if "UTR5" in gtf["protein_coding"][chrom][strand][gene][transcript] and "CDS" in gtf["protein_coding"][chrom][strand][gene][transcript]:
+							five_prime_coordinates = transcript_coordinates(gtf["protein_coding"][chrom][strand][gene][transcript]["UTR5"])
+							five_prime_sequence = extract_fasta_sequence(chrom, strand, gtf["protein_coding"][chrom][strand][gene][transcript]["UTR5"], fasta)
+							cds_coordinates = transcript_coordinates(gtf["protein_coding"][chrom][strand][gene][transcript]["CDS"])
+							cds_sequence = extract_fasta_sequence(chrom, strand, gtf["protein_coding"][chrom][strand][gene][transcript]["CDS"], fasta)
+							uorfs = define_orfs(five_prime_sequence, cds_sequence)
+							count = 1
+							if len(uorfs) > 0:
+								for orf in uorfs:
+									seq, start_pos, end_pos = orf
+									merged_coordinates = five_prime_coordinates + cds_coordinates
+									orf_coordinates = regroup_coordinates(merged_coordinates[start_pos:end_pos])
+									transcript_id = transcript + "." + str(count)
+									for pos in orf_coordinates:
+										if isinstance(gtf["uORF"][chrom][strand][gene][transcript_id]["exon"], list):
+											gtf["uORF"][chrom][strand][gene][transcript_id]["exon"].append(pos)
+										else:
+											gtf["uORF"][chrom][strand][gene][transcript_id]["exon"] = [pos]
+									count += 1
+		logger.info("parse_gtf/add_upstream_ORFs(): Extracting uORF coordinates from protein-coding transcripts... [COMPLETE]")
+		return gtf
+
 	# Further refinement required...
 	def remove_overlapping_transcripts(transcript_gtf, transcript_intervals):
 		cleaned_gtf = hash()
@@ -355,11 +423,12 @@ def parse_gtf(gtf_file, fpkms, window_length, buffers, prefix, sanitize):
 		for transcript, coordinates in flat:
 			gene_type, chrom, strand, gene_id, transcript_id, feature = transcript.split(":")
 			if check_expression(transcript_id, fpkms) == True:
-				if check_length(coordinates, buffers, window_length) == True:
-					try:
-						filtered_gtf[gene_type][chrom][strand][gene_id][transcript_id] = gtf[gene_type][chrom][strand][gene_id][transcript_id]
-					except KeyError:
-						pass
+				# Removed check_length() check because Coherence() should return the full length coherence for short transcripts:
+				#if check_length(coordinates, buffers, window_length) == True:
+				try:
+					filtered_gtf[gene_type][chrom][strand][gene_id][transcript_id] = gtf[gene_type][chrom][strand][gene_id][transcript_id]
+				except KeyError:
+					pass
 		logger.info("parse_gtf/filter_transcripts(): Scrubbing transcripts based on minimum length and expression [COMPLETE].")
 		if sanitize == True:
 			return remove_overlapping_transcripts(filtered_gtf, transcript_intervals)
@@ -386,7 +455,9 @@ def parse_gtf(gtf_file, fpkms, window_length, buffers, prefix, sanitize):
 	# Instantiate the transcript IntervalTree():
 	intervals = interval_tree(transcripts)
 	# Filter transcripts GTF based on minimum length, expression, and sanitize of overlapping transcripts, as requested:
-	return filter_transcripts(partition_utr_coordinates(append_stop_coordinates(transcripts)), fpkms, intervals, window_length, buffers, sanitize)
+	filtered_gtf = filter_transcripts(partition_utr_coordinates(append_stop_coordinates(transcripts)), fpkms, intervals, window_length, buffers, sanitize)
+	uorf_gtf = add_upstream_ORFs(filtered_gtf, genome_fasta)
+	return uorf_gtf
 
 ############################
 # READ COVERAGE EXTRACTION #
@@ -399,16 +470,6 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coo
 		# set of transcript boundary buffers. The read length distribution is output as a
 		# dict() with the read lengths (from 26nt to 34nt) and their respective number of reads
 		# aligned to those transcript coordinates.
-		def regroup_coordinates(coords):
-			first = last = coords[0]
-			for n in coords[1:]:
-				if n-1 == last:
-					last = n
-				else:
-					yield first, last
-					first = last = n
-			yield first, last
-
 		def check_length(coords, buffers, feature):
 			asite_coordinates = transcript_coordinates(coords)
 			if len(asite_coordinates) <= sum(buffers[feature]):
@@ -560,6 +621,7 @@ class Coherence(object):
 		annotation, asite_coverage = self.transcript_coverage
 		gene_type, chrom, strand, gene, transcript, feature = annotation.split(":")
 		check = Checks(asite_coverage, "NA", strand, self.window_length, self.asite_buffer.values())
+		# Both check.coverage() and check.trimming() must pass:
 		if check.coverage() == True and check.trimming() == True:
 			if self.window_length == 0:
 				return "NA"
@@ -579,13 +641,18 @@ class Coherence(object):
 							coherences.append(r('test.spec$coh[which(abs(test.spec$freq-1/3)==min(abs(test.spec$freq-1/3)))]')[0])
 				return coherences
 		else:
-			# Quality check failture:
-			return "NA"
+			if check.coverage() == True:
+				# Return the full coherence signal instead:
+				return self.coherence_signal()
+			else:
+				# Quality check failture:
+				return "NA"
 
 	def spectre_score(self):				
 		annotation, asite_coverage = self.transcript_coverage
 		gene_type, chrom, strand, gene, transcript, feature = annotation.split(":")
 		check = Checks(asite_coverage, "NA", strand, self.window_length, self.asite_buffer.values())
+		# Both check.coverage() and check.trimming() must pass:
 		if check.coverage() == True and check.trimming() == True:
 			if self.window_length == 0:
 				return "NA"
@@ -613,17 +680,17 @@ class Coherence(object):
 					else:
 						return math.fsum([sorted_signal[midpoint], sorted_signal[midpoint+1]]) / 2.0
 		else:
-			return "NA"
+			if check.coverage() == True:
+				# Return the full coherence:
+				return self.coherence_score()
+			else:
+				return "NA"
 
 	def coherence_signal(self):
 		annotation, asite_coverage = self.transcript_coverage
 		gene_type, chrom, strand, gene, transcript, feature = annotation.split(":")
-		check = Checks(asite_coverage, "NA", strand, self.window_length, self.asite_buffer.values())
-		if check.coverage() == True and check.trimming() == True:
-			if "Full" in self.methods:
-				return asite_coverage
-			else:
-				return "NA"
+		if "Full" in self.methods:
+			return asite_coverage
 		else:
 			return "NA"
 
@@ -631,7 +698,9 @@ class Coherence(object):
 		annotation, asite_coverage = self.transcript_coverage
 		gene_type, chrom, strand, gene, transcript, feature = annotation.split(":")
 		check = Checks(asite_coverage, "NA", strand, self.window_length, self.asite_buffer.values())
-		if check.coverage() == True and check.trimming() == True:
+		# As long as there is sufficient read coverage, the full coherence should be calculated for transcripts
+		# of all lengths:
+		if check.coverage() == True:
 			if "Full" in self.methods:
 				# Load the normalized and reference signals into R and calculate the spectral coherence
 				# over the full length of the normalized region:
@@ -1034,7 +1103,7 @@ class ExperimentMetrics(object):
 			logger.info("ExperimentMetrics.full_auc(): Calculating experiment-level Spectral Coherence AUC [COMPLETE].")
 			return str(r('performance(prediction(scores$SPEC, scores$biotype), "auc")@y.values[[1]]')[0])
 
-def print_metrics(output_file, transcript_stats, experiment_stats, reference_distribution, gtf, fpkms, analyses, parameters, verbose_check):
+def print_metrics(output_file, transcript_stats, experiment_stats, genome_fasta, reference_distribution, gtf, fpkms, analyses, parameters, verbose_check):
 
 	def format_coordinates(coords):
 		return ",".join([str(start) + "-" + str(end) for start, end in coords])
@@ -1118,7 +1187,7 @@ def print_metrics(output_file, transcript_stats, experiment_stats, reference_dis
 
 	logger.info("print_metrics/main(): Output results to file... [STARTED]")
 	# Initialize the default header text:
-	header = "\nid\tchr\tstrand\tgene_id\ttranscript_id\tgene_type\tribo_fpkm\tcoordinates_5UTR\tcoordinates_CDS\tcoordinates_3UTR"
+	header = "\nid\tchr\tstrand\tgene_id\ttranscript_id\tgene_type\tribo_fpkm\tcoordinates_5UTR\tcoordinates_CDS\tcoordinates_3UTR\tuORF_sequence"
 	for feature in ("UTR5", "CDS", "UTR3"):
 		for analysis in analyses:
 			if analysis == "SPECtre":
@@ -1145,12 +1214,21 @@ def print_metrics(output_file, transcript_stats, experiment_stats, reference_dis
 							line = "\n" + "\t".join(str(field) for field in [count, chrom, strand, gene, transcript, gene_type, format_fpkm(fpkms, transcript),
 									return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "UTR5"),
 									return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "CDS"),
-									return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "UTR3")])
+									return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "UTR3"),
+									"NA"])
 						else:
-							line = "\n" + "\t".join(str(field) for field in [count, chrom, strand, gene, transcript, gene_type, format_fpkm(fpkms, transcript),
-									return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "UTR5"),
-									return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "exon"),
-									return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "UTR3")])							
+							if gene_type == "uORF":
+								line = "\n" + "\t".join(str(field) for field in [count, chrom, strand, gene, transcript, gene_type, format_fpkm(fpkms, transcript),
+										return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "UTR5"),
+										return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "exon"),
+										return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "UTR3"),
+										extract_fasta_sequence(chrom, strand, gtf[gene_type][chrom][strand][gene][transcript]["exon"], genome_fasta)])							
+							else:
+								line = "\n" + "\t".join(str(field) for field in [count, chrom, strand, gene, transcript, gene_type, format_fpkm(fpkms, transcript),
+										return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "UTR5"),
+										return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "exon"),
+										return_coordinates(gtf, gene_type, chrom, strand, gene, transcript, "UTR3"),
+										"NA"])							
 						for feature in ("UTR5", "CDS", "UTR3"):
 							for analysis in analyses:
 								if analysis == "SPECtre":
@@ -1182,6 +1260,7 @@ if __name__ == "__main__":
 	parser.add_argument("--floss", action="store_true", default="store_false", help="calculate FLOSS and distribution")
 	parser.add_argument("--orfscore", action="store_true", default="store_false", help="calculate ORFScore and distribution")
 	parser.add_argument("--sanitize", action="store_true", default="store_false", help="remove overlapping transcripts")
+	parser.add_argument("--uORF", action="store_true", default="store_false", help="score potential upstream ORFs")
 	parser.add_argument("--verbose", action="store_true", default="store_false", help="print optional metrics including coordinates, coherence and posterior values, etc.")
 	parser.add_argument("--discovery", action="store_true", default="store_false", help="enable discovery mode, see README for details")
 	spectre_args = parser.add_argument_group("parameters for SPECtre analysis:")
@@ -1197,6 +1276,7 @@ if __name__ == "__main__":
 	file_args.add_argument("--fpkm", action="store", required=True, nargs="?", metavar="FILE", type=str, help="location of Cufflinks isoforms.fpkm_tracking file")
 	file_args.add_argument("--gtf", action="store", required=True, nargs="?", metavar="FILE", type=str, help="location of GTF annotation file")
 	file_args.add_argument("--log", action="store", required=False, nargs="?", default=".spectre_results.log", metavar="FILE", help="track progress to (default: %(default)s)")
+	file_args.add_argument("--fasta", action="store", required=False, nargs="?", metavar="FASTA", help="Genome FASTA file if uORF scoring is requested.")
 	args = parser.parse_args()
 
 	# Enable event logging:
@@ -1222,10 +1302,13 @@ if __name__ == "__main__":
 	asite_buffers = {"CDS": (45,15), "UTR": (15,15)}
 	psite_buffers = {"CDS": (3,3), "UTR": (3,3)}
 
+	# Check BAM input for chromosome format:
 	chr_prefix = check_chrom_prefix(args.input)
+	# Load genome FASTA into memory:
+	genome = Fasta(args.fasta)
 	# Extract transcripts, transcript intervals and expression using the provided GTF:
 	transcript_fpkms = extract_fpkms(args.fpkm)
-	transcript_gtf = parse_gtf(args.gtf, transcript_fpkms, int(args.len), asite_buffers.values() + psite_buffers.values(), chr_prefix, args.sanitize)
+	transcript_gtf = parse_gtf(args.gtf, genome, transcript_fpkms, int(args.len), asite_buffers.values() + psite_buffers.values(), chr_prefix, args.uORF, args.sanitize)
 
 	# Initialize the types of analyses to be conducted (default: SPECtre):
 	analyses = ["SPECtre"]
@@ -1245,7 +1328,7 @@ if __name__ == "__main__":
 	#experiment_metrics = ExperimentMetrics(transcript_metrics, transcript_fpkms, analyses, args.min, args.fdr)
 	experiment_metrics = ExperimentMetrics(transcript_metrics, transcript_fpkms, analyses, float(args.min), float(args.fdr))
 	# Print the results table to the output file:
-	print_metrics(open(args.output,"w"), transcript_metrics, experiment_metrics, reference_read_distribution, transcript_gtf, transcript_fpkms, analyses, args, args.verbose)
+	print_metrics(open(args.output,"w"), transcript_metrics, experiment_metrics, genome, reference_read_distribution, transcript_gtf, transcript_fpkms, analyses, args, args.verbose)
 
 
 
