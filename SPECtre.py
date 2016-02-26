@@ -456,8 +456,10 @@ def parse_gtf(gtf_file, genome_fasta, fpkms, window_length, buffers, prefix, add
 	intervals = interval_tree(transcripts)
 	# Filter transcripts GTF based on minimum length, expression, and sanitize of overlapping transcripts, as requested:
 	filtered_gtf = filter_transcripts(partition_utr_coordinates(append_stop_coordinates(transcripts)), fpkms, intervals, window_length, buffers, sanitize)
-	uorf_gtf = add_upstream_ORFs(filtered_gtf, genome_fasta)
-	return uorf_gtf
+	if add_uORFs == True:
+		return add_upstream_ORFs(filtered_gtf, genome_fasta)
+	else:
+		return filtered_gtf
 
 ############################
 # READ COVERAGE EXTRACTION #
