@@ -660,7 +660,7 @@ class Coherence(object):
 				return "NA"
 			else:
 				if self.spectre_analysis == "mean":
-					return math.fsum(self.spectre_signal()) / float(len(self.signal()))
+					return math.fsum(self.spectre_signal()) / float(len(self.spectre_signal()))
 				elif self.spectre_analysis == "median":
 					sorted_signal = sorted(self.spectre_signal())
 					midpoint = (len(sorted_signal)-1) // 2
