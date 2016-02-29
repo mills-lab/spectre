@@ -1307,7 +1307,9 @@ if __name__ == "__main__":
 	# Check BAM input for chromosome format:
 	chr_prefix = check_chrom_prefix(args.input)
 	# Load genome FASTA into memory:
-	genome = Fasta(args.fasta)
+	genome = dict()
+	if args.uORF == True:
+		genome = Fasta(args.fasta)
 	# Extract transcripts, transcript intervals and expression using the provided GTF:
 	transcript_fpkms = extract_fpkms(args.fpkm)
 	transcript_gtf = parse_gtf(args.gtf, genome, transcript_fpkms, int(args.len), asite_buffers.values() + psite_buffers.values(), chr_prefix, args.uORF, args.sanitize)
