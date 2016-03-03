@@ -135,12 +135,12 @@ def calculate_offset_position(read_position, read_strand, read_length, read_ciga
 			else:
 				pos = coordinates[-1] + increment
 		return coordinates
-
+		
 	offsets = {"ingolia": {26: 15, 27: 14, 28: 14, 30: 15, 31: 15}, "bazzini": {26: 12, 27: 12, 28: 12, 29: 12, 30: 12, 31: 12}}
 	if read_strand == "+":
 		return extract_coordinates_from_cigar(read_position, read_cigar)[calculate_offset(offsets[method], read_length)-1]
 	else:
-		return extract_coordinates_from_cigar(read_position, read_cigar)[calculate_offset(offsets[method], read_length)]
+		return extract_coordinates_from_cigar(read_position, read_cigar)[-calculate_offset(offsets[method], read_length)]
 
 class SAM(object):
 
