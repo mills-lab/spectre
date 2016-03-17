@@ -85,11 +85,11 @@ def transcript_length(coords):
 
 def transcript_coordinates(coords):
 	coordinates = []
-	for start, end in coords:
+	for start, end in sorted(coords):
 		region = range(start, end+1)
 		for pos in region:
 			coordinates.append(pos)
-	return coordinates
+	return sorted(coordinates)
 
 def regroup_coordinates(coords):
 	first = last = coords[0]
@@ -103,7 +103,7 @@ def regroup_coordinates(coords):
 
 def extract_fasta_sequence(chrom, strand, coordinates, fasta):
 	seq = str()
-	for start, end in coordinates:
+	for start, end in sorted(coordinates):
 		seq += fasta.sequence({"chr": chrom, "start": int(start), "stop": int(end), "strand": strand})
 	return seq
 
@@ -135,7 +135,7 @@ def calculate_offset_position(read_position, read_strand, read_length, read_ciga
 			else:
 				pos = coordinates[-1] + increment
 		return coordinates
-		
+
 	offsets = {"ingolia": {26: 15, 27: 14, 28: 14, 30: 15, 31: 15}, "bazzini": {26: 12, 27: 12, 28: 12, 29: 12, 30: 12, 31: 12}}
 	if read_strand == "+":
 		return extract_coordinates_from_cigar(read_position, read_cigar)[calculate_offset(offsets[method], read_length)-1]
@@ -614,10 +614,6 @@ class Coherence(object):
 		self.spectre_analysis = spectre_analysis
 		self.methods = methods
 		self.transcript_coverage = transcript_coverage
-
-	def transcript(self):
-		annotation, asite_coverage = self.transcript_coverage
-		return annotation
 
 	def spectre_signal(self):
 		annotation, asite_coverage = self.transcript_coverage
