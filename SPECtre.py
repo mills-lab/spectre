@@ -83,9 +83,26 @@ def transcript_length(coords):
 	return length
 
 def transcript_coordinates(coords):
-	coordinates = []
-	for start, end in sorted(coords):
-		region = range(start, end+1)
+	coordinates = list()
+	if "," in coords:
+		coords = coords.split(",")
+	if isinstance(coords, str):
+		start, end = coords.split("-")
+		region = range(int(start), int(end)+1)
+		for pos in region:
+			coordinates.append(pos)
+	elif isinstance(coords, list):
+		for coord in coords:
+			if isinstance(coord, str):
+				start, end = coord.split("-")
+			else:
+				start, end = coord
+			region = range(int(start), int(end)+1)
+			for pos in region:
+				coordinates.append(pos)
+	else:
+		start, end = coords
+		region = range(int(start), int(end)+1)
 		for pos in region:
 			coordinates.append(pos)
 	return sorted(coordinates)
@@ -386,10 +403,10 @@ def parse_gtf(gtf_file, fpkms, window_length, buffers, prefix, sanitize):
 			seq_name, source, feature, start, end, score, strand, frame, attributes = line.strip().split("\t")
 			if prefix == True:
 				seq_name = convert_chromosome(seq_name)
-			gene_type = re.findall("gene_[a-z]{0,3}type .*;{1}", attributes)[0].split('"')[1]
+			gene_type = re.findall('gene_[a-z]{0,3}type\s\"[\w\.]+\"', attributes)[0].split('"')[1]
 			# Parse annotated protein-coding CDS into the GTF dictionary:
 			if (gene_type == "protein_coding" and feature in ("CDS", "UTR")) or (gene_type != "protein_coding" and feature == "exon"):
-				gene, transcript = re.findall('gene_id "ENS[A-Z]*.*";{1}', attributes)[0].split('"')[1], re.findall('transcript_id "ENS[A-Z]*.*";{1}', attributes)[0].split('"')[1]
+				gene, transcript = re.findall('gene_id\s\"\[\w\.]+\"', attributes)[0].split('"')[1], re.findall('transcript_id\s\"[\w\.]+\"', attributes)[0].split('"')[1]
 				if isinstance(transcripts[gene_type][seq_name][strand][gene][transcript][feature], list):
 					transcripts[gene_type][seq_name][strand][gene][transcript][feature].append((int(start), int(end)))
 				else:
@@ -1107,7 +1124,7 @@ def print_metrics(output_file, transcript_stats, experiment_stats, reference_dis
 			return "NA"
 
 	def write_parameters(parameters, analyses):
-		parameters_string = "\n# Output = " + str(parameters.output) + "\n# FPKM = " + str(parameters.fpkm) + "\n# GTF = " + str(parameters.gtf)
+		parameters_string = "\n# Input = " + str(parameters.input) + " \n# Output = " + str(parameters.output) + "\n# FPKM = " + str(parameters.fpkm) + "\n# GTF = " + str(parameters.gtf)
 		parameters_string += "\n# PARAMETERS\n# Analyses = " + str(analyses) + "\n# Window Length = " + str(parameters.len) + "\n# FPKM Cutoff = " + str(parameters.min) + "\n# FDR = " + str(parameters.fdr) + "\n# Test = " + str(parameters.type)
 		return parameters_string
 
