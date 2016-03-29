@@ -406,7 +406,7 @@ def parse_gtf(gtf_file, fpkms, window_length, buffers, prefix, sanitize):
 			gene_type = re.findall('gene_[a-z]{0,3}type\s\"[\w\.]+\"', attributes)[0].split('"')[1]
 			# Parse annotated protein-coding CDS into the GTF dictionary:
 			if (gene_type == "protein_coding" and feature in ("CDS", "UTR")) or (gene_type != "protein_coding" and feature == "exon"):
-				gene, transcript = re.findall('gene_id\s\"[\w\_\:\:\.]+\"', attributes)[0].split('"')[1], re.findall('transcript_id\s\"[\w\_\:\:\.]+\"', attributes)[0].split('"')[1]
+				gene, transcript = re.findall('gene_id\s\"[\w\_\:\:\.]+\"', attributes)[0].split('"')[1], re.findall('transcript_id\s\"[\w\W]+\"', attributes)[0].split('"')[1]
 				if isinstance(transcripts[gene_type][seq_name][strand][gene][transcript][feature], list):
 					transcripts[gene_type][seq_name][strand][gene][transcript][feature].append((int(start), int(end)))
 				else:
