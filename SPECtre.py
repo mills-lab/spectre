@@ -1153,7 +1153,7 @@ def print_metrics(output_file, transcript_stats, experiment_stats, reference_dis
 	for feature in ("UTR5", "CDS", "UTR3"):
 		for analysis in analyses:
 			if analysis == "SPECtre":
-				header += "\t" + "\t".join(["SPEC_score_" + feature, "SPEC_score_posterior_" + feature, "SPEC_signal_" + feature, "SPEC_signal_posterior_" + feature])
+				header += "\t" + "\t".join(["SPEC_score_" + feature, "SPEC_score_posterior_" + feature, "SPEC_signal_" + feature, "SPEC_signal_posterior_" + feature, "SPEC_reads_" + feature])
 			if analysis == "Full":
 				header += "\t" + "\t".join(["FULL_score_" + feature, "FULL_score_posterior_" + feature, "FULL_signal_" + feature])
 			if analysis == "FLOSS":
@@ -1188,7 +1188,8 @@ def print_metrics(output_file, transcript_stats, experiment_stats, reference_dis
 									line += "\t" + "\t".join([str(return_metric(transcript_stats, gene_type, chrom, strand, gene, transcript, feature, "SPEC_score")),
 											str(return_metric(transcript_stats, gene_type, chrom, strand, gene, transcript, feature, "SPEC_score_posterior")),
 											str(return_metric(transcript_stats, gene_type, chrom, strand, gene, transcript, feature, "SPEC_signal")),
-											str(return_metric(transcript_stats, gene_type, chrom, strand, gene, transcript, feature, "SPEC_signal_posterior"))])
+											str(return_metric(transcript_stats, gene_type, chrom, strand, gene, transcript, feature, "SPEC_signal_posterior")),
+											str(return_metric(transcript_stats, gene_type, chrom, strand, gene, transcript, feature, "A_reads"))])
 								if analysis == "Full":
 									line += "\t" + "\t".join([str(return_metric(transcript_stats, gene_type, chrom, strand, gene, transcript, feature, "FULL_score")),
 											str(return_metric(transcript_stats, gene_type, chrom, strand, gene, transcript, feature, "FULL_score_posterior")),
