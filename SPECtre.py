@@ -197,15 +197,51 @@ class Checks(object):
 			return False
 		else:
 			if self.strand == "+":
-				if math.fsum(self.region[max_left_trim-1:-max_right_trim]) > 0.0:
-					return True
+				if max_left_trim == 0:
+					if max_right_trim == 0:
+						if math.fsum(self.region) > 0.0:
+							return True
+						else:
+							return False
+					else:
+						if math.fsum(self.region[:-max_right_trim]) > 0.0:
+							return True
+						else:
+							return False
 				else:
-					return False
+					if max_right_trim == 0:
+						if math.fsum(self.region[max_left_trim-1:]) > 0.0:
+							return True
+						else:
+							return False
+					else:
+						if math.fsum(self.region[max_left_trim-1:-max_right_trim]) > 0.0:
+							return True
+						else:
+							return False
 			else:
-				if math.fsum(self.region[max_right_trim-1:-max_left_trim]) > 0.0:
-					return True
+				if max_left_trim == 0:
+					if max_right_trim == 0:
+						if math.fsum(self.region) > 0.0:
+							return True
+						else:
+							return False
+					else:
+						if math.fsum(self.region[max_right_trim-1:]) > 0.0:
+							return True
+						else:
+							return False
 				else:
-					return False
+					if max_right_trim == 0:
+						if math.fsum(self.region[:-max_left_trim]) > 0.0:
+							return True
+						else:
+							return False
+					else:
+						if math.fsum(self.region[max_right_trim-1:-max_left_trim]) > 0.0:
+							return True
+						else:
+							return False
 
 	def trimming(self):
 		# Require that each post-trimmed transcript region be at least the length of the sliding window:
@@ -452,9 +488,15 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coo
 		# Minimum transcript length must exceed the region defined by the boundary buffers for that feature:
 		if check_length(coordinates, asite_buffers, feature) == True:
 			if strand == "+":
-				asite_coordinates = asite_coordinates[asite_buffers[feature][0]:-asite_buffers[feature][-1]]
+				if asite_buffers[feature][-1] == 0:
+					asite_coordinates = asite_coordinates[asite_buffers[feature][0]:]
+				else:
+					asite_coordinates = asite_coordinates[asite_buffers[feature][0]:-asite_buffers[feature][-1]]
 			else:
-				asite_coordinates = asite_coordinates[asite_buffers[feature][-1]:-asite_buffers[feature][0]]
+				if asite_buffers[feature][0] == 0:
+					asite_coordinates = asite_coordinates[asite_buffers[feature][-1]:]
+				else:
+					asite_coordinates = asite_coordinates[asite_buffers[feature][-1]:-asite_buffers[feature][0]]
 			buffered_coordinates = regroup_coordinates(asite_coordinates)
 			for start, end in buffered_coordinates:
 				reads = os.popen("samtools view " + bam_file + " " + chrom + ":" + str(start) + "-" + str(end))
@@ -515,7 +557,17 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coo
 		# (CDS, UTR, or Exon). Based on the reads that overlap the buffered transcript coordinates, this
 		# function will output the read distribution over those coordinates by reading frame (+0/+1/+2).
 		def frame_reads(coverage, read_strand, feature, psite_buffers):
-			frame_coverage = coverage[psite_buffers[feature][0]:-psite_buffers[feature][-1]]
+			frame_coverage = list()
+			if strand == "+":
+				if psite_buffers[feature][-1] == 0:
+					frame_coverage = coverage[psite_buffers[feature][0]:]
+				else:
+					frame_coverage = coverage[psite_buffers[feature][0]:-psite_buffers[feature][-1]]
+			else:
+				if psite_buffers[feature][0] == 0:
+					frame_coverage = coverage[psite_buffers[feature][-1]:]
+				else:
+					frame_coverage = coverage[psite_buffers[feature][-1]:-psite_buffers[feature][0]]
 			if sum(frame_coverage) == 0:
 				return "NA"
 			else:
@@ -647,7 +699,7 @@ class Coherence(object):
 	def coherence_signal(self):
 		annotation, asite_coverage = self.transcript_coverage
 		gene_type, chrom, strand, gene, transcript, feature = annotation.split(":")
-		if "Full" in self.methods:
+		if "Full" in self.methods or "SPECtre" in self.methods:
 			return asite_coverage
 		else:
 			return "NA"
