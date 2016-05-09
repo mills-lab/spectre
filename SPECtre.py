@@ -252,7 +252,7 @@ class Checks(object):
 			return False
 
 	def frames(self):
-		if self.frame_reads == "NA":
+		if self.frame_reads == "NA" or self.frame_reads is None:
 			return False
 		elif sum(self.frame_reads) > 0:
 			return True
@@ -583,6 +583,33 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coo
 					reads = [sum(masked_region[::-1][i::3]) for i in (0,1,2)]
 				return reads
 
+	def raw_asite_coverage(bam_file, asite_buffers, annotation_coordinates):
+		# This function takes as input a BAM alignment file, A-site regional boundary buffers, and an
+		# annotation_coordinates() object that defines a transcript and its constituent coordinates.
+		# The transcript is de-limited into: gene_type, chromosome, strand, gene, transcrip and feature
+		# (CDS, UTR, or Exon). Based on the reads that overlap the buffered transcript coordinates, this
+		# function will output the normalized read coverage over those coordinates.
+		annotation, coordinates = annotation_coordinates
+		gene_type, chrom, strand, gene, transcript, feature = annotation.split(":")
+		# Instantiate the raw coverage as a list() of the same length as defined by the transcript coordinates.
+		transcript_coverage = [0]*transcript_length(coordinates)
+		# Extract the coordinates into a list():
+		transcript_positions = transcript_coordinates(coordinates)
+		for start, end in coordinates:
+			reads = os.popen("samtools view " + bam_file + " " + chrom + ":" + str(start) + "-" + str(end))
+			for read in reads:
+				bam = SAM(read)
+				read_strand = decode(bam.flag())
+				if read_strand == strand:
+					offset_position = calculate_offset_position(int(bam.pos()), read_strand, len(bam.seq()), bam.cigar(), "ingolia")
+					if offset_position in transcript_positions:
+						transcript_position = transcript_positions.index(offset_position)
+						transcript_coverage[transcript_position] += 1
+		if sum(transcript_coverage) == 0:
+			return "NA"
+		else:
+			return [transcript_coverage[::-1], transcript_coverage][strand == "+"]
+
 		# Transcript is defined as a tuple of (annotation, coordinates):
 		annotation, coordinates = annotation_coordinates
 		# Annotation is further delimited into: gene_type, chromosome, strand, gene, transcript, and feature:
@@ -608,7 +635,7 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coo
 		else:
 			return frame_reads(transcript_coverage, strand, feature, psite_buffers)
 	annotation, coordinates = annotation_coordinates
-	return annotation, (extract_asite_reads(bam_file, asite_buffers, annotation_coordinates), extract_asite_coverage(bam_file, asite_buffers, annotation_coordinates), extract_psite_reads(bam_file, psite_buffers, annotation_coordinates))
+	return annotation, (extract_asite_reads(bam_file, asite_buffers, annotation_coordinates), extract_asite_coverage(bam_file, asite_buffers, annotation_coordinates), extract_psite_reads(bam_file, psite_buffers, annotation_coordinates), raw_asite_coverage(bam_file, asite_buffers, annotation_coordinates))
 
 ################################
 # TRANSCRIPT SCORING FUNCTIONS #
@@ -633,29 +660,25 @@ class Coherence(object):
 		check = Checks(asite_coverage, "NA", strand, self.window_length, self.asite_buffer.values())
 		# Both check.coverage() and check.trimming() must pass:
 		if check.coverage() == True and check.trimming() == True:
-			if self.window_length == 0:
-				return "NA"
-			else:
-				# Generate the reference coverage signal based on the length of the normalized region:
-				reference_signal = ([4/6.0,1/6.0,1/6.0]*int(math.ceil(len(asite_coverage)/3.0)))[0:len(asite_coverage)]
-				coherences = list()
-				if len(asite_coverage) >= self.window_length:
-					for i in range(0, len(asite_coverage))[::int(self.step_size)]:
-						j = i + self.window_length
-						if (math.fsum(asite_coverage[i:j]) == 0) or (len(asite_coverage[i:j]) < self.window_length):
-							coherences.append(0.0)
-						else:
-							r('window.region <- c(%s)' % ",".join(str(n) for n in asite_coverage[i:j]))
-							r('window.coding <- c(%s)' % ",".join(str(n) for n in reference_signal[i:j]))
-							r('test.spec <- spec.pgram(data.frame(window.region, window.coding), spans=c(3,3), plot=FALSE)')
-							coherences.append(r('test.spec$coh[which(abs(test.spec$freq-1/3)==min(abs(test.spec$freq-1/3)))]')[0])
-				return coherences
+			# Generate the reference coverage signal based on the length of the normalized region:
+			reference_signal = ([4/6.0,1/6.0,1/6.0]*int(math.ceil(len(asite_coverage)/3.0)))[0:len(asite_coverage)]
+			coherences = list()
+			for i in range(0, len(asite_coverage))[::int(self.step_size)]:
+				j = i + self.window_length
+				if (math.fsum(asite_coverage[i:j]) == 0) or (len(asite_coverage[i:j]) < self.window_length):
+					coherences.append(0.0)
+				else:
+					r('window.region <- c(%s)' % ",".join(str(n) for n in asite_coverage[i:j]))
+					r('window.coding <- c(%s)' % ",".join(str(n) for n in reference_signal[i:j]))
+					r('test.spec <- spec.pgram(data.frame(window.region, window.coding), spans=c(3,3), plot=FALSE)')
+					coherences.append(r('test.spec$coh[which(abs(test.spec$freq-1/3)==min(abs(test.spec$freq-1/3)))]')[0])
+			return coherences
 		else:
 			if check.coverage() == True:
-				# Return the full coherence signal instead:
-				return self.coherence_signal()
+				# Trimmed region is not of sufficient length:
+				return "NA"
 			else:
-				# Quality check failture:
+				# Coverage over region is not sufficient:
 				return "NA"
 
 	def spectre_score(self):				
@@ -664,7 +687,8 @@ class Coherence(object):
 		check = Checks(asite_coverage, "NA", strand, self.window_length, self.asite_buffer.values())
 		# Both check.coverage() and check.trimming() must pass:
 		if check.coverage() == True and check.trimming() == True:
-			if self.window_length == 0:
+			if self.spectre_signal() == "NA":
+				# Cannot calculate a SPECtre score:
 				return "NA"
 			else:
 				if self.spectre_analysis == "mean":
@@ -689,12 +713,19 @@ class Coherence(object):
 						return sorted_signal[midpoint]
 					else:
 						return math.fsum([sorted_signal[midpoint], sorted_signal[midpoint+1]]) / 2.0
+				else:
+					# Default to calculation of the median SPECtre score:
+					sorted_signal = sorted(self.spectre_signal())
+					midpoint = (len(sorted_signal)-1) // 2
+					if len(sorted_signal) % 2:
+						return sorted_signal[midpoint]
+					else:
+						return math.fsum([sorted_signal[midpoint], sorted_signal[midpoint+1]]) / 2.0
 		else:
 			if check.coverage() == True:
-				# Return the full coherence:
-				return self.coherence_score()
+				return "trim_fail"
 			else:
-				return "NA"
+				return "coverage_fail"
 
 	def coherence_signal(self):
 		annotation, asite_coverage = self.transcript_coverage
@@ -721,6 +752,33 @@ class Coherence(object):
 				return r('spec.coding$coh[which(abs(spec.coding$freq-1/3)==min(abs(spec.coding$freq-1/3)))]')[0]
 			else:
 				return "NA"
+		else:
+			return "NA"
+
+	def phase(self):
+		annotation, asite_coverage = self.transcript_coverage
+		gene_type, chrom, strand, gene, transcript, feature = annotation.split(":")
+		check = Checks(asite_coverage, "NA", strand, self.window_length, self.asite_buffer.values())
+		# Both check.coverage() and check.trimming() must pass:
+		if check.coverage() == True and check.trimming() == True:
+			if self.spectre_signal() == "NA":
+				# Cannot calculate a SPECtre score:
+				return "NA"
+			else:
+				# Generate the reference coverage signal based on the length of the normalized region:
+				reference_signal = ([4/6.0,1/6.0,1/6.0]*int(math.ceil(len(asite_coverage)/3.0)))[0:len(asite_coverage)]
+				r('test.region <- c(%s)' % ",".join(str(n) for n in asite_coverage))
+				r('test.coding <- c(%s)' % ",".join(str(n) for n in reference_signal))
+				r('spec.coding <- spec.pgram(data.frame(test.region, test.coding), spans=c(3,3), plot=FALSE)')
+				frame = r('round(test.spec$phase[which(abs(test.spec$freq-1/3)==min(abs(test.spec$freq-1/3)))])')[0]
+				if frame == 2:
+					return "+1"
+				elif frame == -2:
+					return "+2"
+				elif frame == 0:
+					return "+0"
+				else:
+					return "NA"
 		else:
 			return "NA"
 
@@ -897,6 +955,7 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffer, psite_buf
 	transcript_spectre_signals = dict(zip([scores.transcript() for scores in coherences], [scores.spectre_signal() for scores in coherences]))
 	transcript_coherence_scores = dict(zip([scores.transcript() for scores in coherences], [scores.coherence_score() for scores in coherences]))
 	transcript_coherence_signals = dict(zip([scores.transcript() for scores in coherences], [scores.coherence_signal() for scores in coherences]))
+	transcript_phases = dict(zip([scores.transcript() for scores in coherences], [scores.phase() for scores in coherences]))
 	logger.info("calculate_transcript_scores/main(): Building Coherence function and calculating SPECtre/Coherence scores for each transcript... [COMPLETE].")
 	# Calculate FLOSS read distributions for each transcript:
 	logger.info("calculate_transcript_scores/main(): Building FLOSS function and calculating read length distribution for each transcript... [STARTED].")
@@ -988,6 +1047,7 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffer, psite_buf
 	metrics = populate_hash(metrics, "SPEC_signal", transcript_spectre_signals.items())
 	metrics = populate_hash(metrics, "SPEC_score_posterior", transcript_spectre_posteriors.items())
 	metrics = populate_hash(metrics, "SPEC_signal_posterior", transcript_windowed_posteriors.items())
+	metrics = populate_hash(metrics, "SPEC_phase", transcript_phases.items())
 	logger.info("calculate_transcript_scores/main(): Output transcript SPECtre scores, signals and posteriors to hash()... [COMPLETE].")
 	if "Full" in methods:
 		logger.info("calculate_transcript_scores/main(): Output transcript Coherence scores, signals and posteriors to hash()... [STARTED].")
