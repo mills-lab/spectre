@@ -583,6 +583,31 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coo
 					reads = [sum(masked_region[::-1][i::3]) for i in (0,1,2)]
 				return reads
 
+		# Transcript is defined as a tuple of (annotation, coordinates):
+		annotation, coordinates = annotation_coordinates
+		# Annotation is further delimited into: gene_type, chromosome, strand, gene, transcript, and feature:
+		gene_type, chrom, strand, gene, transcript, feature = annotation.split(":")
+		if "UTR" in feature:
+			feature = "UTR"
+		elif "exon" in feature:
+			feature = "CDS"
+		transcript_coverage = [0]*transcript_length(coordinates)
+		transcript_coords = transcript_coordinates(coordinates)
+		for start, end in coordinates:
+			reads = os.popen("samtools view " + bam_file + " " + chrom + ":" + str(start) + "-" + str(end))
+			for read in reads:
+				bam = SAM(read)
+				read_strand = decode(bam.flag())
+				if read_strand == strand:
+					offset_position = calculate_offset_position(int(bam.pos()), read_strand, len(bam.seq()), bam.cigar(), "bazzini")
+					if offset_position in transcript_coords:
+						transcript_position = transcript_coords.index(offset_position)
+						transcript_coverage[transcript_position] += 1
+		if sum(transcript_coverage) == 0:
+			return "NA"
+		else:
+			return frame_reads(transcript_coverage, strand, feature, psite_buffers)
+
 	def raw_asite_coverage(bam_file, asite_buffers, annotation_coordinates):
 		# This function takes as input a BAM alignment file, A-site regional boundary buffers, and an
 		# annotation_coordinates() object that defines a transcript and its constituent coordinates.
@@ -610,30 +635,6 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coo
 		else:
 			return [transcript_coverage[::-1], transcript_coverage][strand == "+"]
 
-		# Transcript is defined as a tuple of (annotation, coordinates):
-		annotation, coordinates = annotation_coordinates
-		# Annotation is further delimited into: gene_type, chromosome, strand, gene, transcript, and feature:
-		gene_type, chrom, strand, gene, transcript, feature = annotation.split(":")
-		if "UTR" in feature:
-			feature = "UTR"
-		elif "exon" in feature:
-			feature = "CDS"
-		transcript_coverage = [0]*transcript_length(coordinates)
-		transcript_coords = transcript_coordinates(coordinates)
-		for start, end in coordinates:
-			reads = os.popen("samtools view " + bam_file + " " + chrom + ":" + str(start) + "-" + str(end))
-			for read in reads:
-				bam = SAM(read)
-				read_strand = decode(bam.flag())
-				if read_strand == strand:
-					offset_position = calculate_offset_position(int(bam.pos()), read_strand, len(bam.seq()), bam.cigar(), "bazzini")
-					if offset_position in transcript_coords:
-						transcript_position = transcript_coords.index(offset_position)
-						transcript_coverage[transcript_position] += 1
-		if sum(transcript_coverage) == 0:
-			return "NA"
-		else:
-			return frame_reads(transcript_coverage, strand, feature, psite_buffers)
 	annotation, coordinates = annotation_coordinates
 	return annotation, (extract_asite_reads(bam_file, asite_buffers, annotation_coordinates), extract_asite_coverage(bam_file, asite_buffers, annotation_coordinates), extract_psite_reads(bam_file, psite_buffers, annotation_coordinates), raw_asite_coverage(bam_file, asite_buffers, annotation_coordinates))
 
