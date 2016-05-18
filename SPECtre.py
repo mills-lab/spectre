@@ -457,6 +457,7 @@ def parse_gtf(gtf_file, fpkms, window_length, buffers, prefix, sanitize):
 # READ COVERAGE EXTRACTION #
 ############################
 def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coordinates):
+
 	def extract_asite_reads(bam_file, asite_buffers, annotation_coordinates):
 		# This function takes as input a tuple of transcript annotation information and its
 		# coordinates, and outputs the A-site adjusted reads within those coordinates organized
@@ -635,6 +636,7 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coo
 		else:
 			return [transcript_coverage[::-1], transcript_coverage][strand == "+"]
 
+	print "# extracting read coverage statistics for:", str(annotation_coordinates)
 	annotation, coordinates = annotation_coordinates
 	return annotation, (extract_asite_reads(bam_file, asite_buffers, annotation_coordinates), extract_asite_coverage(bam_file, asite_buffers, annotation_coordinates), extract_psite_reads(bam_file, psite_buffers, annotation_coordinates), raw_asite_coverage(bam_file, asite_buffers, annotation_coordinates))
 
@@ -724,9 +726,9 @@ class Coherence(object):
 						return math.fsum([sorted_signal[midpoint], sorted_signal[midpoint+1]]) / 2.0
 		else:
 			if check.coverage() == True:
-				return "trim_fail"
+				return "NA"
 			else:
-				return "coverage_fail"
+				return "NA"
 
 	def coherence_signal(self):
 		annotation, asite_coverage = self.transcript_coverage
@@ -1371,6 +1373,7 @@ if __name__ == "__main__":
 	transcript_fpkms = extract_fpkms(args.fpkm)
 	transcript_gtf = parse_gtf(args.gtf, transcript_fpkms, int(args.len), asite_buffers.values() + psite_buffers.values(), chr_prefix, args.sanitize)
 
+	print "# num_transcripts in GTF: ", str(len(flatten(transcript_gtf).items()))
 	# Initialize the types of analyses to be conducted (default: SPECtre):
 	analyses = ["SPECtre"]
 	if args.full == True:
