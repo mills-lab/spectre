@@ -636,7 +636,6 @@ def extract_read_coverage(bam_file, asite_buffers, psite_buffers, annotation_coo
 		else:
 			return [transcript_coverage[::-1], transcript_coverage][strand == "+"]
 
-	print "# extracting read coverage statistics for:", str(annotation_coordinates)
 	annotation, coordinates = annotation_coordinates
 	return annotation, (extract_asite_reads(bam_file, asite_buffers, annotation_coordinates), extract_asite_coverage(bam_file, asite_buffers, annotation_coordinates), extract_psite_reads(bam_file, psite_buffers, annotation_coordinates), raw_asite_coverage(bam_file, asite_buffers, annotation_coordinates))
 
