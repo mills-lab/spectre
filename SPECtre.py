@@ -743,15 +743,18 @@ class Coherence(object):
 		check = Checks(asite_coverage, "NA", strand, self.window_length, self.asite_buffer.values())
 		# As long as there is sufficient read coverage, the full coherence should be calculated for transcripts
 		# of all lengths:
-		if check.coverage() == True:
-			if "Full" in self.methods:
-				# Load the normalized and reference signals into R and calculate the spectral coherence
-				# over the full length of the normalized region:
-				reference_signal = ([4/6.0, 1/6.0, 1/6.0]*int(math.ceil(len(asite_coverage)/3.0)))[0:len(asite_coverage)]
-				r('test.region <- c(%s)' %",".join(str(n) for n in asite_coverage))
-				r('test.coding <- c(%s)' %",".join(str(n) for n in reference_signal))
-				r('spec.coding <- spec.pgram(data.frame(test.region, test.coding), spans=c(3,3), plot=FALSE)')
-				return r('spec.coding$coh[which(abs(spec.coding$freq-1/3)==min(abs(spec.coding$freq-1/3)))]')[0]
+		if "Full" in self.methods:
+			if check.coverage() == True:
+				if "Full" in self.methods:
+					# Load the normalized and reference signals into R and calculate the spectral coherence
+					# over the full length of the normalized region:
+					reference_signal = ([4/6.0, 1/6.0, 1/6.0]*int(math.ceil(len(asite_coverage)/3.0)))[0:len(asite_coverage)]
+					r('test.region <- c(%s)' %",".join(str(n) for n in asite_coverage))
+					r('test.coding <- c(%s)' %",".join(str(n) for n in reference_signal))
+					r('spec.coding <- spec.pgram(data.frame(test.region, test.coding), spans=c(3,3), plot=FALSE)')
+					return r('spec.coding$coh[which(abs(spec.coding$freq-1/3)==min(abs(spec.coding$freq-1/3)))]')[0]
+				else:
+					return "NA"
 			else:
 				return "NA"
 		else:
