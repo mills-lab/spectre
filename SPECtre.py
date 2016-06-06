@@ -1279,7 +1279,7 @@ if __name__ == "__main__":
 	spectre_args.add_argument("--min", action="store", required=False, nargs="?", default=3, metavar="FLOAT", help="minimum FPKM for active translation (default: %(default)s FPKM)")
 	spectre_args.add_argument("--fdr", action="store", required=False, nargs="?", default=0.05, metavar="FLOAT", help="FDR cutoff (default: %(default)s)")
 	spectre_args.add_argument("--type", action="store", required=False, nargs="?", default="median", metavar="TYPE", choices=["mean","median","max","nonzero_mean","nonzero_median"], help="metric for SPECtre analysis (choices: mean,[median],max,nonzero_mean,nonzero_median)")
-	spectre_args.add_argument("--offsets", action="store", required=False, nargs="?", metavar="LIST", help="comma-delimited user-defined list of read_length:offset_position definitions (eg. 28:12,29:14,30:15,31:15,32:15)")
+	spectre_args.add_argument("--offsets", action="store", required=False, nargs="?", default="", metavar="LIST", help="comma-delimited user-defined list of read_length:offset_position definitions (eg. 28:12,29:14,30:15,31:15,32:15)")
 	file_args = parser.add_argument_group("input and output parameters:")
 	file_args.add_argument("--input", action="store", required=True, nargs="?", metavar="BAM", type=str, help="location of BAM alignment file")
 	file_args.add_argument("--output", action="store", required=True, nargs="?", default="./spectre_results.txt", metavar="FILE", help="write results to (default: %(default)s)")
