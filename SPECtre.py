@@ -1121,7 +1121,7 @@ class ExperimentMetrics(object):
 			logger.info("ExperimentMetrics.full_auc(): Calculating experiment-level Spectral Coherence AUC [COMPLETE].")
 			return str(r('performance(prediction(scores$SPEC, scores$biotype), "auc")@y.values[[1]]')[0])
 
-def print_metrics(output_file, transcript_stats, experiment_stats, reference_distribution, gtf, fpkms, analyses, parameters, verbose_check):
+def print_metrics(output_file, transcript_stats, experiment_stats, reference_distribution, gtf, fpkms, analyses, parameters):
 
 	def format_coordinates(coords):
 		if len(coords) == 0:
@@ -1343,7 +1343,7 @@ if __name__ == "__main__":
 	# signal plots (based on windowed spectral coherence).
 	experiment_metrics = ExperimentMetrics(transcript_metrics, transcript_fpkms, analyses, float(args.min), float(args.fdr))
 	# Print the results table to the output file:
-	print_metrics(open(args.output,"w"), transcript_metrics, experiment_metrics, reference_read_distribution, transcript_gtf, transcript_fpkms, analyses, args, args.verbose)
+	print_metrics(open(args.output,"w"), transcript_metrics, experiment_metrics, reference_read_distribution, transcript_gtf, transcript_fpkms, analyses, args)
 
 
 
