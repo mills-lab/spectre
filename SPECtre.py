@@ -796,7 +796,7 @@ class ORF(object):
 #######################################################
 # FINAL TRANSCRIPT SCORE CALCULATIONS AND AGGREGATION #
 #######################################################
-def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_buffers, bam_tree, window_length, step_size, spectre_analysis, methods, offsets, threads):
+def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_buffers, bam_tree, window_length, step_size, spectre_analysis, methods, offsets, split, threads):
 
 	'''
 	For each transcript, this function is to calculate (if so designated) its SPECtre metrics
@@ -939,39 +939,49 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_bu
 	#####################################################################################
 	# BUILD DISTRIBUTIONS BASED ON TRANSLATIONAL STATUS FOR PROTEIN-CODING TRANSCRIPTS: #
 	#####################################################################################
-	logger.info("calculate_transcript_scores(): Building distributions for posteriors calculation... [STARTED].")
-	# For transcripts with SPECtre scores:
-	logger.info("calculate_transcript_scores(): Buliding distributions for SPECtre posteriors... [STARTED].")
-	protein_coding_spectre_scores = [(transcript, score) for transcript, score in transcript_spectre_scores.items() if "protein_coding" in transcript.lower() if "cds" in transcript.lower()]
-	translated_spectre_scores, untranslated_spectre_scores = build_translation_distributions(fpkms, fpkm_cutoff, protein_coding_spectre_scores)
-	logger.info("calculate_transcript_scores(): Buliding distributions for SPECtre posteriors... [COMPLETE].")
+	if split == True:
+		logger.info("calculate_transcript_scores(): Populating NAs for split analysis posteriors... [STARTED].")		
+	else:
+		logger.info("calculate_transcript_scores(): Building distributions for posteriors calculation... [STARTED].")
+		# For transcripts with SPECtre scores:
+		logger.info("calculate_transcript_scores(): Buliding distributions for SPECtre posteriors... [STARTED].")
+		protein_coding_spectre_scores = [(transcript, score) for transcript, score in transcript_spectre_scores.items() if "protein_coding" in transcript.lower() if "cds" in transcript.lower()]
+		translated_spectre_scores, untranslated_spectre_scores = build_translation_distributions(fpkms, fpkm_cutoff, protein_coding_spectre_scores)
+		logger.info("calculate_transcript_scores(): Buliding distributions for SPECtre posteriors... [COMPLETE].")
 
-	# For transcripts with Coherence scores:
-	logger.info("calculate_transcript_scores(): Building distributions for Coherence posteriors... [STARTED].")
-	protein_coding_coherence_scores = [(transcript, score) for transcript, score in transcript_coherence_scores.items() if "protein_coding" in transcript.lower() if "cds" in transcript.lower()]
-	translated_coherence_scores, untranslated_coherence_scores = build_translation_distributions(fpkms, fpkm_cutoff, protein_coding_coherence_scores)
-	logger.info("calculate_transcript_scores(): Building distributions for Coherence posteriors... [STARTED].")
-	logger.info("calculate_transcript_scores(): Building distributions for posteriors calculation... [COMPLETE].")
+		# For transcripts with Coherence scores:
+		logger.info("calculate_transcript_scores(): Building distributions for Coherence posteriors... [STARTED].")
+		protein_coding_coherence_scores = [(transcript, score) for transcript, score in transcript_coherence_scores.items() if "protein_coding" in transcript.lower() if "cds" in transcript.lower()]
+		translated_coherence_scores, untranslated_coherence_scores = build_translation_distributions(fpkms, fpkm_cutoff, protein_coding_coherence_scores)
+		logger.info("calculate_transcript_scores(): Building distributions for Coherence posteriors... [STARTED].")
+		logger.info("calculate_transcript_scores(): Building distributions for posteriors calculation... [COMPLETE].")
 
 	##############################################################################
 	# CALCULATE THE SPECTRE AND COHERENCE SCORE POSTERIORS FOR EACH TRANSCRIPT : #
 	##############################################################################
-	logger.info("calculate_transcript_scores(): Calculating transcript posteriors... [STARTED].")
-	# Build partial functions:
-	Coherence_post = partial(posterior_probability, translated_coherence_scores, untranslated_coherence_scores)
-	Windowed_post = partial(posterior_probability, translated_spectre_scores, untranslated_spectre_scores)
-	SPECtre_post = partial(posterior_probability, translated_spectre_scores, untranslated_spectre_scores)
-	# Calculate the posterior probabilities for each transcript:
-	logger.info("calculate_transcript_scores(): Calculating SPECtre/Coherence transcript posteriors... [STARTED].")
-	coherence_posteriors = pool.map(Coherence_post, transcript_coherence_scores.iteritems())
-	windowed_posteriors = pool.map(Windowed_post, transcript_spectre_signals.iteritems())
-	spectre_posteriors = pool.map(SPECtre_post, transcript_spectre_scores.iteritems())
-	# Parition SPECtre/Coherence posteriors to their respective containers:
-	transcript_coherence_posteriors = dict(zip([transcript for transcript, posterior in coherence_posteriors], [posterior for transcript, posterior in coherence_posteriors]))
-	transcript_windowed_posteriors = dict(zip([transcript for transcript, posterior in windowed_posteriors], [posterior for transcript, posterior in windowed_posteriors]))
-	transcript_spectre_posteriors = dict(zip([transcript for transcript, posterior in spectre_posteriors], [posterior for transcript, posterior in spectre_posteriors]))
-	logger.info("calculate_transcript_scores(): Calculating SPECtre/Coherence transcript posteriors... [COMPLETE].")
-	logger.info("calculate_transcript_scores(): Calculating transcript-level metrics [COMPLETE].")
+	if split == True:
+		transcript_coherence_posteriors = dict(zip([transcript for transcript, coherence in transcript_coherence_scores.iteritems()], ["NA" for transcript, coherence in transcript_coherence_scores.iteritems()]))
+		transcript_windowed_posteriors = dict(zip([transcript for transcript, signal in transcript_spectre_signals.iteritems()], ["NA" for transcript, signal in transcript_spectre_signals.iteritems()]))
+		transcript_spectre_posteriors = dict(zip([transcript for transcript, score in transcript_spectre_scores.iteritems()], ["NA" for transcript, score in transcript_spectre_scores.iteritems()]))
+		logger.info("calculate_transcript_scores(): Populating NAs for split analysis posteriors... [COMPLETE].")		
+	else:
+		logger.info("calculate_transcript_scores(): Calculating transcript posteriors... [STARTED].")
+		# Build partial functions:
+		Coherence_post = partial(posterior_probability, translated_coherence_scores, untranslated_coherence_scores)
+		Windowed_post = partial(posterior_probability, translated_spectre_scores, untranslated_spectre_scores)
+		SPECtre_post = partial(posterior_probability, translated_spectre_scores, untranslated_spectre_scores)
+		# Calculate the posterior probabilities for each transcript:
+		logger.info("calculate_transcript_scores(): Calculating SPECtre/Coherence transcript posteriors... [STARTED].")
+		coherence_posteriors = pool.map(Coherence_post, transcript_coherence_scores.iteritems())
+		windowed_posteriors = pool.map(Windowed_post, transcript_spectre_signals.iteritems())
+		spectre_posteriors = pool.map(SPECtre_post, transcript_spectre_scores.iteritems())
+		# Parition SPECtre/Coherence posteriors to their respective containers:
+		transcript_coherence_posteriors = dict(zip([transcript for transcript, posterior in coherence_posteriors], [posterior for transcript, posterior in coherence_posteriors]))
+		transcript_windowed_posteriors = dict(zip([transcript for transcript, posterior in windowed_posteriors], [posterior for transcript, posterior in windowed_posteriors]))
+		transcript_spectre_posteriors = dict(zip([transcript for transcript, posterior in spectre_posteriors], [posterior for transcript, posterior in spectre_posteriors]))
+		logger.info("calculate_transcript_scores(): Calculating SPECtre/Coherence transcript posteriors... [COMPLETE].")
+		logger.info("calculate_transcript_scores(): Calculating transcript-level metrics [COMPLETE].")
+
 
 	#####################################################################################
 	# OUTPUT THE TRANSCRIPT COVERAGES, SCORES AND POSTERIORS TO A COMPOSITE DICTIONARY: #
@@ -1121,7 +1131,7 @@ class ExperimentMetrics(object):
 			logger.info("ExperimentMetrics.full_auc(): Calculating experiment-level Spectral Coherence AUC [COMPLETE].")
 			return str(r('performance(prediction(scores$SPEC, scores$biotype), "auc")@y.values[[1]]')[0])
 
-def print_metrics(output_file, transcript_stats, experiment_stats, reference_distribution, gtf, fpkms, analyses, parameters):
+def print_metrics(output_file, transcript_stats, experiment_stats, reference_distribution, gtf, fpkms, analyses, split, parameters):
 
 	def format_coordinates(coords):
 		if len(coords) == 0:
@@ -1221,9 +1231,12 @@ def print_metrics(output_file, transcript_stats, experiment_stats, reference_dis
 			if analysis == "ORFscore":
 				header += "\t" + "\t".join(["ORF_score_" + feature, "ORF_reads_" + feature])
 
-	output_file.write("# FILE I/O:" + write_parameters(parameters, analyses))
-	output_file.write("\n# METRICS:" + write_experiment_metrics(experiment_stats))
-	output_file.write("\n" + str(zip(*reference_distribution.items())))
+	if split == True:
+		output_file.write("# FILE I/O:" + write_parameters(parameters, analyses))
+	else:
+		output_file.write("# FILE I/O:" + write_parameters(parameters, analyses))
+		output_file.write("\n# METRICS:" + write_experiment_metrics(experiment_stats))
+		output_file.write("\n" + str(zip(*reference_distribution.items())))
 	output_file.write(header)
 
 	count = 1
@@ -1272,6 +1285,7 @@ if __name__ == "__main__":
 	parser.add_argument("--floss", action="store_true", default="store_false", help="calculate FLOSS and distribution")
 	parser.add_argument("--orfscore", action="store_true", default="store_false", help="calculate ORFScore and distribution")
 	parser.add_argument("--sanitize", action="store_true", default="store_false", help="remove overlapping transcripts")
+	parser.add_argument("--split", action="store_true", default="store_false", help="enable split chromosome analysis (faster)")
 	spectre_args = parser.add_argument_group("parameters for SPECtre analysis:")
 	spectre_args.add_argument("--nt", action="store", required=False, nargs="?", default=1, metavar="INT", help="number of threads for multi-processing (default: %(default)s)")
 	spectre_args.add_argument("--len", action="store", required=False, nargs="?", default=30, metavar="INT", help="length of sliding window (default: %(default)s)")
@@ -1336,14 +1350,14 @@ if __name__ == "__main__":
 		analyses.append("ORFscore")
 
 	# Calculate the designated transcript-level scores based on the analyses to be conducted:
-	transcript_metrics, reference_read_distribution = calculate_transcript_scores(transcript_gtf, transcript_fpkms, float(args.min), asite_buffers, psite_buffers, bam, int(args.len), int(args.step), args.type, analyses, offsets, int(args.nt))
+	transcript_metrics, reference_read_distribution = calculate_transcript_scores(transcript_gtf, transcript_fpkms, float(args.min), asite_buffers, psite_buffers, bam, int(args.len), int(args.step), args.type, analyses, offsets, args.split, int(args.nt))
 	
 	# Perform a second-pass global analysis based on the transcript-level metrics, such as:
 	# ROC analyses, posterior probability as a function of empirical FDR, and codon window
 	# signal plots (based on windowed spectral coherence).
 	experiment_metrics = ExperimentMetrics(transcript_metrics, transcript_fpkms, analyses, float(args.min), float(args.fdr))
 	# Print the results table to the output file:
-	print_metrics(open(args.output,"w"), transcript_metrics, experiment_metrics, reference_read_distribution, transcript_gtf, transcript_fpkms, analyses, args)
+	print_metrics(open(args.output,"w"), transcript_metrics, experiment_metrics, reference_read_distribution, transcript_gtf, transcript_fpkms, analyses, args.split, args)
 
 
 
