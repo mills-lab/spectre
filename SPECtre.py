@@ -834,26 +834,6 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_bu
 	psite_coverage = array.psite_coverage()
 	logger.info("calculate_transcript_scores(): Calculating A/P-site read distribution and coverage... [COMPLETE].")
 
-	#Calculate FLOSS read distributions for each transcript:
-	logger.info("calculate_transcript_scores(): Calculating FLOSS read length distributions... [STARTED].")
-	FLOSS_func = partial(FLOSS, fpkms, methods, window_length, asite_buffers, asite_coverage)
-	floss_distributions = pool.map(FLOSS_func, flatten(gtf).iteritems())	
-	# Partition FLOSS distributions to their respective containers:
-	transcript_floss_asite_coverages = dict(zip([floss.annotation() for floss in floss_distributions], [floss.a_coverage() for floss in floss_distributions]))
-	transcript_floss_distributions = dict(zip([floss.annotation() for floss in floss_distributions], [floss.distribution() for floss in floss_distributions]))
-	logger.info("calculate_transcript_scores(): Calculating FLOSS read length distributions... [COMPLETE].")
-	# Build FLOSS reference distribution:
-	logger.info("calculate_transcript_scores(): Calculating FLOSS reference read distribution... [STARTED].")
-	protein_coding_distributions = [distribution for transcript, distribution in transcript_floss_distributions.items() if "protein_coding" in transcript.lower() if "cds" in transcript.lower()]
-	reference_distribution = calculate_reference_distribution(protein_coding_distributions)
-	logger.info("calculate_transcript_scores(): Calculating FLOSS reference read distribution... [COMPLETE].")
-	# Calculate FLOSS scores for each transcript using reference distribution:
-	logger.info("calculate_transcript_scores(): Calculating FLOSS from read length distributions... [STARTED].")
-	FLOSS_metric = partial(calculate_floss_score, reference_distribution)
-	floss_scores = pool.map(FLOSS_metric, transcript_floss_distributions.iteritems())
-	transcript_floss_scores = dict(zip(transcripts, floss_scores))
-	logger.info("calculate_transcript_scores(): Calculating FLOSS from read length distributions... [COMPLETE].")
-	
 	###################################################################################################
 	# CALCULATE THE SPECTRE, FULL COHERENCE, FLOSS READ DISTRIBUTION AND ORFSCORE FOR EACH TRANSCRIPT #
 	###################################################################################################
@@ -1321,4 +1301,3 @@ if __name__ == "__main__":
 	else:
 		print "[ERROR]: Please check that your BAM, GTF and Cufflinks input files are formatted correctly..."
 	sys.exit()
-	
