@@ -285,7 +285,7 @@ def extract_fpkms(cufflinks_file):
 				if j.upper() == "FPKM":
 					position = i
 		else:
-			transcript, fpkm = line.strip().split("\t")[0], float(line.strip().split("\t")[position])
+			transcript, fpkm = re.findall("ENST[0-0]+", line.strip().split("\t")[0])[0], float(line.strip().split("\t")[position])
 			if transcript not in fpkms:
 				fpkms[transcript] = fpkm
 	logger.info("extract_fpkms(): Parsing transcript FPKMs from file: " + cufflinks_file + " to memory... [COMPLETE]")
