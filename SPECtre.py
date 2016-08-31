@@ -77,7 +77,7 @@ def add_custom_offsets(custom, default):
 			default["custom"] = {int(read): int(pos)}
 	return default
 
-def check_chromosomes(bam_file, gtf_file, cufflinks_file):
+def check_chromosomes(bam_file, gtf_file, cufflinks_file, target_chroms):
 	# Checks the format of the chromosomes in each input file for compatibility.
 	def get_bam_chroms(bam_file):
 		header = os.popen("samtools view -H " + bam_file)
@@ -108,7 +108,10 @@ def check_chromosomes(bam_file, gtf_file, cufflinks_file):
 				chroms.append(chrom)
 		return sorted(chroms)
 
-	if all(chrom in get_bam_chroms(bam_file) for chrom in get_gtf_chroms(gtf_file) for chrom in get_cufflinks_chroms(cufflinks_file)):
+	def get_target_chroms(targets):
+		return [str(chrom) for chrom in targets.split(",")]
+
+	if all(chrom in get_bam_chroms(bam_file) for chrom in get_gtf_chroms(gtf_file) for chrom in get_cufflinks_chroms(cufflinks_file) for chrom in get_target_chroms(target_chroms)):
 		return True
 	else:
 		return False
@@ -270,7 +273,7 @@ class Checks(object):
 ##############
 # ANNOTATION #
 ##############
-def extract_fpkms(cufflinks_file):
+def extract_fpkms(cufflinks_file, targets):
 	# This function takes as input a Cufflinks isoforms.fpkm_tracking output
 	# file and extracts the transcript-level expression in FPKM. Pleast note 
 	# that, as written, this function should support a generic tab-delimited
@@ -285,16 +288,18 @@ def extract_fpkms(cufflinks_file):
 				if j.upper() == "FPKM":
 					position = i
 		else:
-			transcript, fpkm = re.findall("ENST[0-0]+", line.strip().split("\t")[0])[0], float(line.strip().split("\t")[position])
-			if transcript not in fpkms:
-				fpkms[transcript] = fpkm
+			transcript = re.findall("ENST[0-9]+", line.strip().split("\t")[0])[0] if "transcript" in line else line.strip().split("\t")[0]
+			chrom, fpkm = line.strip().split("\t")[6].split(":")[0], float(line.strip().split("\t")[position])
+			if len(targets) == 0 or chrom in targets:
+				if transcript not in fpkms:
+					fpkms[transcript] = fpkm
 	logger.info("extract_fpkms(): Parsing transcript FPKMs from file: " + cufflinks_file + " to memory... [COMPLETE]")
 	return fpkms
 
 ##############
 # ANNOTATION #
 ##############
-def parse_gtf(gtf_file, fpkms):
+def parse_gtf(gtf_file, fpkms, targets):
 	# This function takes as input a user-supplied GTF transcript annotation file
 	# and extracts the CDS and UTR intervals of protein-coding genes, and the start
 	# and end coordinates of non-coding transcripts. The coordinates are loaded
@@ -341,29 +346,30 @@ def parse_gtf(gtf_file, fpkms):
 		try:
 			# Extract the necessary fields from the GTF record:
 			chrom, strand, gene_id, transcript_id = record.iv.chrom, record.iv.strand, record.attr["gene_id"], record.attr["transcript_id"]
-			if transcript_id in fpkms:
-				if fpkms[transcript_id] > 0.0:
-					biotype_field = "gene_biotype" if "gene_biotype" in record.attr.keys() else "gene_type" if "gene_type" in record.attr.keys() else str()
-					if record.attr[biotype_field] == "protein_coding":
-						if record.type in ("CDS", "stop_codon"):
-							if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"], list):
-								transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"].append(record.iv)
-							else:
-								transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"] = [record.iv]
-							intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "CDS"])
-						elif record.type == "UTR":
-							if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"], list):
-								transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"].append(record.iv)
-							else:
-								transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"] = [record.iv]
-							intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "UTR"])
-					else:
-						if record.type == "exon":
-							if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"], list):
-								transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"].append(record.iv)
-							else:
-								transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"] = [record.iv]
-							intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "exon"])
+			if chrom in targets or len(targets) == 0:
+				if transcript_id in fpkms:
+					if fpkms[transcript_id] > 0.0:
+						biotype_field = "gene_biotype" if "gene_biotype" in record.attr.keys() else "gene_type" if "gene_type" in record.attr.keys() else str()
+						if record.attr[biotype_field] == "protein_coding":
+							if record.type in ("CDS", "stop_codon"):
+								if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"], list):
+									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"].append(record.iv)
+								else:
+									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"] = [record.iv]
+								intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "CDS"])
+							elif record.type == "UTR":
+								if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"], list):
+									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"].append(record.iv)
+								else:
+									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"] = [record.iv]
+								intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "UTR"])
+						else:
+							if record.type == "exon":
+								if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"], list):
+									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"].append(record.iv)
+								else:
+									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"] = [record.iv]
+								intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "exon"])
 		except KeyError:
 			pass
 	logger.info("parse_gtf(): Parsing transcript coordinates from GTF: " + gtf_file + " into memory... [COMPLETE]")
@@ -377,9 +383,10 @@ class Coverage(object):
 	# Take in as input a BAM file of read alignments, then return them as an
 	# HTSeq BAM_Reader object. In addition, convert the positions BAM read
 	# alignments to their A/P-site position as a GenomicArray (coverage) object. 
-	def __init__(self, asite_offsets, psite_offsets, bam):
+	def __init__(self, asite_offsets, psite_offsets, targets, bam):
 		self.asite_offsets = asite_offsets
 		self.psite_offsets = psite_offsets
+		self.targets = targets
 		self.bam = bam
 
 	@staticmethod
@@ -398,16 +405,17 @@ class Coverage(object):
 			# Extract the read chromosome and strand from the GenomicInterval() of the read:
 			read_chrom = read.iv.chrom
 			read_strand = read.iv.strand
-			# Based on the read CIGAR string, convert the aligned read position to its P-site
-			# offset position:
-			offset = self.calculate_offset_position(self.psite_offsets, len(read.get_sam_line().split("\t")[9]))
-			if read_strand == "+":
-				# Since Python indexes are 0-based:
-				reference_pos = convert_cigar_to_reference_coordinates(read.cigar)[offset - 1]
-			else:
-				reference_pos = convert_cigar_to_reference_coordinates(read.cigar)[-offset]
-			# Add the P-site offset position as a GenomicPosition in the coverage array:
-			coverage[HTSeq.GenomicPosition(read_chrom, reference_pos, read_strand)] += 1
+			if read_chrom in self.targets or len(self.targets) == 0:
+				# Based on the read CIGAR string, convert the aligned read position to its P-site
+				# offset position:
+				offset = self.calculate_offset_position(self.psite_offsets, len(read.get_sam_line().split("\t")[9]))
+				if read_strand == "+":
+					# Since Python indexes are 0-based:
+					reference_pos = convert_cigar_to_reference_coordinates(read.cigar)[offset - 1]
+				else:
+					reference_pos = convert_cigar_to_reference_coordinates(read.cigar)[-offset]
+				# Add the P-site offset position as a GenomicPosition in the coverage array:
+				coverage[HTSeq.GenomicPosition(read_chrom, reference_pos, read_strand)] += 1
 		return coverage
 
 	def asite_coverage(self):
@@ -419,18 +427,19 @@ class Coverage(object):
 			# Extract the read chromosome and strand from the GenomicInterval of the read:
 			read_chrom = read.iv.chrom
 			read_strand = read.iv.strand
-			# Based on the CIGAR string of the read, convert the aligned read position to its
-			# A-Site offset position:
-			name = read.get_sam_line().split("\t")[0] + "|" + str(len(read.get_sam_line().split("\t")[9]))
-			offset = self.calculate_offset_position(self.asite_offsets, len(read.get_sam_line().split("\t")[9]))
-			if read_strand == "+":
-				reference_start = convert_cigar_to_reference_coordinates(read.cigar)[offset - 1]
-				reference_end = convert_cigar_to_reference_coordinates(read.cigar)[offset]
-			else:
-				reference_start = convert_cigar_to_reference_coordinates(read.cigar)[-offset - 1]
-				reference_end = convert_cigar_to_reference_coordinates(read.cigar)[-offset]
-			# Add the A-site offset position as a 1-base length GenomicInterval in the coverage array:
-			coverage[HTSeq.GenomicInterval(read_chrom, reference_start, reference_end, read_strand)] += name
+			if read_chrom in self.targets or len(self.targets) == 0:
+				# Based on the CIGAR string of the read, convert the aligned read position to its
+				# A-Site offset position:
+				name = read.get_sam_line().split("\t")[0] + "|" + str(len(read.get_sam_line().split("\t")[9]))
+				offset = self.calculate_offset_position(self.asite_offsets, len(read.get_sam_line().split("\t")[9]))
+				if read_strand == "+":
+					reference_start = convert_cigar_to_reference_coordinates(read.cigar)[offset - 1]
+					reference_end = convert_cigar_to_reference_coordinates(read.cigar)[offset]
+				else:
+					reference_start = convert_cigar_to_reference_coordinates(read.cigar)[-offset - 1]
+					reference_end = convert_cigar_to_reference_coordinates(read.cigar)[-offset]
+				# Add the A-site offset position as a 1-base length GenomicInterval in the coverage array:
+				coverage[HTSeq.GenomicInterval(read_chrom, reference_start, reference_end, read_strand)] += name
 		return coverage
 
 ########################################
@@ -722,7 +731,7 @@ class ORF(object):
 #################################################
 # TRANSCRIPT SCORE CALCULATIONS AND AGGREGATION #
 #################################################
-def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_buffers, orfscore_buffers, bam_file, window_length, step_size, spectre_type, methods, offsets, split, threads):
+def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_buffers, orfscore_buffers, bam_file, window_length, step_size, spectre_type, methods, offsets, target_chroms, threads):
 
 	'''
 	For each transcript, this function is to calculate (if so designated) its SPECtre metrics
@@ -828,7 +837,7 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_bu
 	bam = HTSeq.BAM_Reader(bam_file)
 	logger.info("calculate_transcript_scores(): Loading alignments from: " + bam_file + " into BAM_Reader()... [COMPLETE].")
 	# Extract the A/P-site adjusted coverage based on the input BAM file:
-	array = Coverage(asite_offsets, psite_offsets, bam)
+	array = Coverage(asite_offsets, psite_offsets, target_chroms, bam)
 	# Partition coverages to their respective containers:
 	asite_coverage = array.asite_coverage()
 	psite_coverage = array.psite_coverage()
@@ -850,39 +859,41 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_bu
 	transcript_spectre_phases = dict(zip([scores.annotation() for scores in coherences], [scores.spectre_phase() for scores in coherences]))
 	logger.info("calculate_transcript_scores(): Calculating SPECtre/Coherence scores... [COMPLETE].")
 
-	# Calculate FLOSS read distributions for each transcript:
-	logger.info("calculate_transcript_scores(): Calculating FLOSS read length distributions... [STARTED].")
-	FLOSS_func = partial(FLOSS, fpkms, methods, window_length, asite_buffers, asite_coverage)
-	floss_distributions = pool.map(FLOSS_func, flatten(gtf).iteritems())	
-	# Partition FLOSS distributions to their respective containers:
-	transcript_floss_asite_coverages = dict(zip([floss.annotation() for floss in floss_distributions], [floss.a_coverage() for floss in floss_distributions]))
-	transcript_floss_distributions = dict(zip([floss.annotation() for floss in floss_distributions], [floss.distribution() for floss in floss_distributions]))
-	logger.info("calculate_transcript_scores(): Calculating FLOSS read length distributions... [COMPLETE].")
-	# Build FLOSS reference distribution:
-	logger.info("calculate_transcript_scores(): Calculating FLOSS reference read distribution... [STARTED].")
-	protein_coding_distributions = [distribution for transcript, distribution in transcript_floss_distributions.items() if "protein_coding" in transcript.lower() if "cds" in transcript.lower()]
-	reference_distribution = calculate_reference_distribution(protein_coding_distributions)
-	logger.info("calculate_transcript_scores(): Calculating FLOSS reference read distribution... [COMPLETE].")
-	# Calculate FLOSS scores for each transcript using reference distribution:
-	logger.info("calculate_transcript_scores(): Calculating FLOSS from read length distributions... [STARTED].")
-	FLOSS_metric = partial(calculate_floss_score, reference_distribution)
-	floss_scores = pool.map(FLOSS_metric, transcript_floss_distributions.iteritems())
-	transcript_floss_scores = dict(zip(transcripts, floss_scores))
-	logger.info("calculate_transcript_scores(): Calculating FLOSS from read length distributions... [COMPLETE].")
+	if "FLOSS" in methods:
+		# Calculate FLOSS read distributions for each transcript:
+		logger.info("calculate_transcript_scores(): Calculating FLOSS read length distributions... [STARTED].")
+		FLOSS_func = partial(FLOSS, fpkms, methods, window_length, asite_buffers, asite_coverage)
+		floss_distributions = pool.map(FLOSS_func, flatten(gtf).iteritems())	
+		# Partition FLOSS distributions to their respective containers:
+		transcript_floss_asite_coverages = dict(zip([floss.annotation() for floss in floss_distributions], [floss.a_coverage() for floss in floss_distributions]))
+		transcript_floss_distributions = dict(zip([floss.annotation() for floss in floss_distributions], [floss.distribution() for floss in floss_distributions]))
+		logger.info("calculate_transcript_scores(): Calculating FLOSS read length distributions... [COMPLETE].")
+		# Build FLOSS reference distribution:
+		logger.info("calculate_transcript_scores(): Calculating FLOSS reference read distribution... [STARTED].")
+		protein_coding_distributions = [distribution for transcript, distribution in transcript_floss_distributions.items() if "protein_coding" in transcript.lower() if "cds" in transcript.lower()]
+		reference_distribution = calculate_reference_distribution(protein_coding_distributions)
+		logger.info("calculate_transcript_scores(): Calculating FLOSS reference read distribution... [COMPLETE].")
+		# Calculate FLOSS scores for each transcript using reference distribution:
+		logger.info("calculate_transcript_scores(): Calculating FLOSS from read length distributions... [STARTED].")
+		FLOSS_metric = partial(calculate_floss_score, reference_distribution)
+		floss_scores = pool.map(FLOSS_metric, transcript_floss_distributions.iteritems())
+		transcript_floss_scores = dict(zip(transcripts, floss_scores))
+		logger.info("calculate_transcript_scores(): Calculating FLOSS from read length distributions... [COMPLETE].")
 
-	# Calculate ORFscore for each transcript:
-	logger.info("calculate_transcript_scores(): Calculating ORFscore from frame distributions... [STARTED].")
-	ORF_func = partial(ORF, fpkms, methods, orfscore_buffers, window_length, psite_coverage)
-	orf_scores = pool.map(ORF_func, flatten(gtf).iteritems())
-	# Parition ORF scores to their respective containers:
-	transcript_orf_scores = dict(zip([orf.annotation() for orf in orf_scores], [orf.score() for orf in orf_scores]))
-	transcript_orf_reads = dict(zip([orf.annotation() for orf in orf_scores], [orf.reads() for orf in orf_scores]))
-	logger.info("calculate_transcript_scores(): Calculating ORFscore from frame distributions... [COMPLETE].")
+	if "ORFscore" in methods:
+		# Calculate ORFscore for each transcript:
+		logger.info("calculate_transcript_scores(): Calculating ORFscore from frame distributions... [STARTED].")
+		ORF_func = partial(ORF, fpkms, methods, orfscore_buffers, window_length, psite_coverage)
+		orf_scores = pool.map(ORF_func, flatten(gtf).iteritems())
+		# Parition ORF scores to their respective containers:
+		transcript_orf_scores = dict(zip([orf.annotation() for orf in orf_scores], [orf.score() for orf in orf_scores]))
+		transcript_orf_reads = dict(zip([orf.annotation() for orf in orf_scores], [orf.reads() for orf in orf_scores]))
+		logger.info("calculate_transcript_scores(): Calculating ORFscore from frame distributions... [COMPLETE].")
 
 	#####################################################################################
 	# BUILD DISTRIBUTIONS BASED ON TRANSLATIONAL STATUS FOR PROTEIN-CODING TRANSCRIPTS: #
 	#####################################################################################
-	if split == True:
+	if len(target_chroms) > 0:
 		logger.info("calculate_transcript_scores(): Populating NAs for split analysis posteriors... [STARTED].")		
 	else:
 		logger.info("calculate_transcript_scores(): Building distributions for posteriors calculation... [STARTED].")
@@ -902,7 +913,7 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_bu
 	##############################################################################
 	# CALCULATE THE SPECTRE AND COHERENCE SCORE POSTERIORS FOR EACH TRANSCRIPT : #
 	##############################################################################
-	if split == True:
+	if len(target_chroms) > 0:
 		transcript_coherence_posteriors = dict(zip([transcript for transcript, coherence in transcript_coherence_scores.iteritems()], ["NA" for transcript, coherence in transcript_coherence_scores.iteritems()]))
 		transcript_windowed_posteriors = dict(zip([transcript for transcript, signal in transcript_spectre_signals.iteritems()], ["NA" for transcript, signal in transcript_spectre_signals.iteritems()]))
 		transcript_spectre_posteriors = dict(zip([transcript for transcript, score in transcript_spectre_scores.iteritems()], ["NA" for transcript, score in transcript_spectre_scores.iteritems()]))
@@ -934,7 +945,8 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_bu
 
 	# Populate the hash() with the A-site and P-site read coverages:
 	logger.info("calculate_transcript_scores(): Output transcript A/P-site read coverages... [STARTED].")
-	metrics = populate_hash(metrics, "A_coverage", transcript_floss_asite_coverages.items())
+	if "FLOSS" in methods:
+		metrics = populate_hash(metrics, "A_coverage", transcript_floss_asite_coverages.items())
 	metrics = populate_hash(metrics, "P_coverage", transcript_spectre_psite_coverages.items())
 	logger.info("calculate_transcript_scores(): Output transcript A/P-site read coverages... [COMPLETE].")
 
@@ -964,8 +976,11 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_bu
 		metrics = populate_hash(metrics, "ORF_reads", transcript_orf_reads.items())
 		logger.info("calculate_transcript_scores(): Output ORFscores... [COMPLETE].")
 	logger.info("calculate_transcript_scores(): Output transcript metrics to hash()... [COMPLETE].")
-	return metrics, reference_distribution
-
+	if "FLOSS" in methods:
+		return metrics, reference_distribution
+	else:
+		return metrics, "NA"
+		
 ##### STILL NEED EDITS #####
 class ExperimentMetrics(object):
 
@@ -1173,7 +1188,7 @@ def print_metrics(output_file, transcript_stats, experiment_stats, reference_dis
 			if analysis == "ORFscore":
 				header += "\t" + "\t".join(["ORF_score_" + feature, "ORF_reads_" + feature])
 
-	if split == True:
+	if len(target_chroms) > 0:
 		output_file.write("# FILE I/O:" + write_parameters(parameters, analyses))
 	else:
 		output_file.write("# FILE I/O:" + write_parameters(parameters, analyses))
@@ -1226,14 +1241,14 @@ if __name__ == "__main__":
 	parser.add_argument("--full", action="store_true", default="store_false", help="calculate un-windowed spectral coherence")
 	parser.add_argument("--floss", action="store_true", default="store_false", help="calculate FLOSS and distribution")
 	parser.add_argument("--orfscore", action="store_true", default="store_false", help="calculate ORFScore and distribution")
-	parser.add_argument("--split", action="store_true", default="store_false", help="enable split chromosome analysis (faster)")
 	spectre_args = parser.add_argument_group("parameters for SPECtre analysis:")
 	spectre_args.add_argument("--nt", action="store", required=False, nargs="?", default=1, metavar="INT", help="number of threads for multi-processing (default: %(default)s)")
 	spectre_args.add_argument("--len", action="store", required=False, nargs="?", default=30, metavar="INT", help="length of sliding window (default: %(default)s)")
-	spectre_args.add_argument("--step", action="store", required=False, nargs="?", default=3, metavar="INT", help="distance between sliding windows (default: %(default)s)")
 	spectre_args.add_argument("--min", action="store", required=False, nargs="?", default=3, metavar="FLOAT", help="minimum FPKM for active translation (default: %(default)s FPKM)")
 	spectre_args.add_argument("--fdr", action="store", required=False, nargs="?", default=0.05, metavar="FLOAT", help="FDR cutoff (default: %(default)s)")
+	spectre_args.add_argument("--step", action="store", required=False, nargs="?", default=3, metavar="INT", help="distance between sliding windows (default: %(default)s)")
 	spectre_args.add_argument("--type", action="store", required=False, nargs="?", default="median", metavar="TYPE", choices=["mean","median","max","nonzero_mean","nonzero_median"], help="metric for SPECtre analysis (choices: mean,[median],max,nonzero_mean,nonzero_median)")
+	spectre_args.add_argument("--target", action="store", required=False, nargs="?", default="", metavar="LIST", help="specify a single chromosome ('X') or comma-delimited list of chromosomes to enable split chromosome analysis (faster)")
 	spectre_args.add_argument("--offsets", action="store", required=False, nargs="?", default="", metavar="LIST", help="comma-delimited user-defined list of read_length:offset_position definitions (eg. 28:12,29:14,30:15,31:15,32:15)")
 	file_args = parser.add_argument_group("input and output parameters:")
 	file_args.add_argument("--input", action="store", required=True, nargs="?", metavar="BAM", type=str, help="location of BAM alignment file")
@@ -1274,11 +1289,14 @@ if __name__ == "__main__":
 
 	# Initial check of chromosome format in BAM, GTF and Cufflinks input:
 	logger.info("main(): Checking validity of input files... [STARTED].")
-	if check_chromosomes(args.input, args.gtf, args.fpkm) == True:
+	if check_chromosomes(args.input, args.gtf, args.fpkm, args.target) == True:
 		logger.info("main(): Checking validity of input files... [COMPLETE].")
+
+		# Initialize the chromosome(s) to be targeted for analysis:
+		target_chroms = [str(chrom) for chrom in args.target.split(",") if len(chrom) > 0]
 		# Extract transcripts, transcript intervals and expression using the provided GTF:
-		transcript_fpkms = extract_fpkms(args.fpkm)
-		transcript_array, transcript_intervals, transcript_gtf = parse_gtf(args.gtf, transcript_fpkms)
+		transcript_fpkms = extract_fpkms(args.fpkm, target_chroms)
+		transcript_array, transcript_intervals, transcript_gtf = parse_gtf(args.gtf, transcript_fpkms, target_chroms)
 
 		# Initialize the types of analyses to be conducted (default: SPECtre):
 		analyses = ["SPECtre"]
@@ -1289,15 +1307,16 @@ if __name__ == "__main__":
 		if args.orfscore == True:
 			analyses.append("ORFscore")
 
+
 		# Calculate the designated transcript-level scores based on the analyses to be conducted:
-		transcript_metrics, reference_read_distribution = calculate_transcript_scores(transcript_gtf, transcript_fpkms, float(args.min), asite_buffers, psite_buffers, orfscore_buffers, args.input, int(args.len), int(args.step), args.type, analyses, offsets, args.split, int(args.nt))
+		transcript_metrics, reference_read_distribution = calculate_transcript_scores(transcript_gtf, transcript_fpkms, float(args.min), asite_buffers, psite_buffers, orfscore_buffers, args.input, int(args.len), int(args.step), args.type, analyses, offsets, target_chroms, int(args.nt))
 		
 		# Perform a second-pass global analysis based on the transcript-level metrics, such as:
 		# ROC analyses, posterior probability as a function of empirical FDR, and codon window
 		# signal plots (based on windowed spectral coherence).
 		experiment_metrics = ExperimentMetrics(transcript_metrics, transcript_fpkms, analyses, float(args.min), float(args.fdr))
 		# Print the results table to the output file:
-		print_metrics(open(args.output,"w"), transcript_metrics, experiment_metrics, reference_read_distribution, transcript_gtf, transcript_fpkms, analyses, args.split, args)
+		print_metrics(open(args.output,"w"), transcript_metrics, experiment_metrics, reference_read_distribution, transcript_gtf, transcript_fpkms, analyses, target_chroms, args)
 	else:
 		print "[ERROR]: Please check that your BAM, GTF and Cufflinks input files are formatted correctly..."
 	sys.exit()
