@@ -289,7 +289,7 @@ def extract_fpkms(cufflinks_file, targets):
 					position = i
 		else:
 			tracking_id, gene_id = line.strip().split("\t")[0], line.strip().split("\t")[3]
-			if not tracking_id = gene_id:
+			if not tracking_id == gene_id:
 				transcript = re.findall("ENST[0-9]+", tracking_id) if "ENST" in tracking_id else line.strip().split("\t")[0]
 			chrom, fpkm = line.strip().split("\t")[6].split(":")[0], float(line.strip().split("\t")[position])
 			if len(targets) == 0 or chrom in targets:
