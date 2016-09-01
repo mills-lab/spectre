@@ -288,7 +288,9 @@ def extract_fpkms(cufflinks_file, targets):
 				if j.upper() == "FPKM":
 					position = i
 		else:
-			transcript = re.findall("ENST[0-9]+", line.strip().split("\t")[0])[0] if "transcript" in line else line.strip().split("\t")[0]
+			tracking_id, gene_id = line.strip().split("\t")[0], line.strip().split("\t")[3]
+			if not tracking_id = gene_id:
+				transcript = re.findall("ENST[0-9]+", tracking_id) if "ENST" in tracking_id else line.strip().split("\t")[0]
 			chrom, fpkm = line.strip().split("\t")[6].split(":")[0], float(line.strip().split("\t")[position])
 			if len(targets) == 0 or chrom in targets:
 				if transcript not in fpkms:
@@ -980,7 +982,7 @@ def calculate_transcript_scores(gtf, fpkms, fpkm_cutoff, asite_buffers, psite_bu
 		return metrics, reference_distribution
 	else:
 		return metrics, "NA"
-		
+
 ##### STILL NEED EDITS #####
 class ExperimentMetrics(object):
 
