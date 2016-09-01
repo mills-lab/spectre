@@ -290,11 +290,10 @@ def extract_fpkms(cufflinks_file, targets):
 		else:
 			tracking_id, gene_id = line.strip().split("\t")[0], line.strip().split("\t")[3]
 			if not tracking_id == gene_id:
-				transcript = re.findall("ENST[0-9]+", tracking_id) if "ENST" in tracking_id else line.strip().split("\t")[0]
-			chrom, fpkm = line.strip().split("\t")[6].split(":")[0], float(line.strip().split("\t")[position])
-			if len(targets) == 0 or chrom in targets:
-				if transcript not in fpkms:
-					fpkms[transcript] = fpkm
+				chrom, fpkm = line.strip().split("\t")[6].split(":")[0], float(line.strip().split("\t")[position])
+				if len(targets) == 0 or chrom in targets:
+					if tracking_id not in fpkms:
+						fpkms[tracking_id] = fpkm
 	logger.info("extract_fpkms(): Parsing transcript FPKMs from file: " + cufflinks_file + " to memory... [COMPLETE]")
 	return fpkms
 
