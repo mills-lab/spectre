@@ -164,6 +164,10 @@ Note the directory location of these files for future steps.
 
 ###SPECtre Analysis
 ```
+	# CALCULATE CUSTOM P-SITE OFFSETS (IF NECESSARY):
+	python calculate_psite_offsets.py /path/to/Mus_musculus.GRCm38.78.gtf /path/to/<filtered_hits.bam>
+
+	# SPECTRE COMMAND LINE INPUT:
 	python SPECtre.py \
 		--input /path/to/<filtered_hits.bam> \
 		--output /path/to/<spectre_output.txt> \
@@ -177,6 +181,9 @@ Note the directory location of these files for future steps.
 		--fdr 0.05	# FDR cutoff for translation threshold.
 		--step 3	# Number of nucleotides between sliding windows.
 		--type median	# Metric for SPECtre analysis (median, mean, maximum, etc.).
+
+	Alternate P-site offsets can be supplied with the following flag:
+		--offsets 28:12,29:12,30:12,31:14,32:15
 	
 	Additional analyses may be specified by inclusion of the following flags:
 		--floss
