@@ -5,14 +5,14 @@ This software is designed to identify regions of active translation from ribosom
 
 ##Required Resources:
 ```
-R:			https://www.r-project.org/
-Rpy:			http://rpy.sourceforge.net
-ROCR:                   https://rocr.bioinf.mpi-sb.mpg.de/```
-Python:			https://www.python.org
-HTSeq:			https://pypi.python.org/pypi/HTSeq
-NumPy:			https://pypi.python.org/pypi/numpy              
-pysam:			https://pypi.python.org/pypi/pysam/
-pyfasta:		https://pypi.python.org/pypi/pyfasta/
+R:		https://www.r-project.org/
+Rpy:		http://rpy.sourceforge.net
+ROCR:		https://rocr.bioinf.mpi-sb.mpg.de/
+Python:		https://www.python.org
+HTSeq:		https://pypi.python.org/pypi/HTSeq
+NumPy:		https://pypi.python.org/pypi/numpy              
+pysam:		https://pypi.python.org/pypi/pysam/
+pyfasta:	https://pypi.python.org/pypi/pyfasta/
 
 ##Quick Start
 Download and Install:
@@ -61,10 +61,15 @@ python SPECtre.py [parameters]
 
 ####User-defined Analytical Arguments:
 ```
+	--nt <INTEGER>, number of threads for multi-processing (default: 1)
 	--len <INTEGER>, length in nucleotides of sliding window for SPECtre analysis (default: 30 nt)
 	--min <FLOAT>, minimum FPKM or reads required for classification as active translation (default: 5 FPKM)
 	--fdr <FLOAT>, FDR cutoff to use for calculation of posterior probabilities (default: 0.05)
+	--step <INT>, distance between sliding windows (default: 3)
+	--target <LIST>, specify a single chromosome ("X") or comma-delimited list of chromosomes, to enable splic analysis (faster)
+	--offsets <LIST>, comma-delimited list of read_length:offset_position definitions (eg. "28:12,29:14,30:15,31:15,32:15")
 	--type <STRING>, summary statistic to use for SPECtre score (default: median)
+
 ```
 
 ####Optional Arguments:
@@ -72,9 +77,6 @@ python SPECtre.py [parameters]
 	--full, enables calculation of un-windowed spectral coherence over full length of transcript
 	--floss, enables calculation of FLOSS metric (Ingolia, 2014) for each transcript
 	--orfscore, enables calculation of ORFscore (Bazzini, 2014) for each transcript
-	--discovery, enables "Discovery Mode" see README for details (not yet supported)
-	--sanitize, removes overlapping and proximally-located transcripts from analyses
-	--verbose, print additional optional metrics to the output file
 ```
 
 ##Test Data:
@@ -172,6 +174,7 @@ Note the directory location of these files for future steps.
 		--len 30	# Specifies the length of the sliding window used.
 		--min 5.0	# Enforces the designated FPKM cutoff for translational status.
 		--fdr 0.05	# FDR cutoff for translation threshold.
+		--step 3	# Number of nucleotides between sliding windows.
 		--type median	# Metric for SPECtre analysis (median, mean, maximum, etc.).
 	
 	Additional analyses may be specified by inclusion of the following flags:
@@ -201,11 +204,3 @@ Note the directory location of these files for future steps.
 	   14) spectre_posterior_probability [3'UTR]
 	   ---
 	   Full Transcript Spectral Coherence, FLOSS, and ORFscore will follow the same generalized output format as that of SPECtre (above).
-	       
-	   Specification of --verbose in the command-line input will generate additonal output, including:
-	   - coordinates annoated for each region tested (5'UTR, CDS/Exon, 3'UTR)
-	   - coherence estimates over each window in a region
-	   - posterior probabilities for each coherence estimate over a region
-	   - FLOSS read length distributions
-	   - ORFscore frame distributions
-```
