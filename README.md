@@ -13,6 +13,7 @@ HTSeq:		https://pypi.python.org/pypi/HTSeq
 NumPy:		https://pypi.python.org/pypi/numpy              
 pysam:		https://pypi.python.org/pypi/pysam/
 pyfasta:	https://pypi.python.org/pypi/pyfasta/
+```
 
 ##Quick Start
 Download and Install:
