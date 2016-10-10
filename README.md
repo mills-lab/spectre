@@ -176,10 +176,10 @@ Note the directory location of these files for future steps.
 		--fpkm /path/to/cufflinks/<isoforms.fpkm_tracking>
 	
 	Default parameters are as follows:
-		--len 30	# Specifies the length of the sliding window used.
-		--min 5.0	# Enforces the designated FPKM cutoff for translational status.
-		--fdr 0.05	# FDR cutoff for translation threshold.
-		--step 3	# Number of nucleotides between sliding windows.
+		--len 30		# Specifies the length of the sliding window used.
+		--min 5.0		# Enforces the designated FPKM cutoff for translational status.
+		--fdr 0.05		# FDR cutoff for translation threshold.
+		--step 3		# Number of nucleotides between sliding windows.
 		--type median	# Metric for SPECtre analysis (median, mean, maximum, etc.).
 
 	Alternate P-site offsets can be supplied with the following flag:
