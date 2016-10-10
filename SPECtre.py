@@ -343,36 +343,41 @@ def parse_gtf(gtf_file, fpkms, targets):
 	gtf = HTSeq.GFF_Reader(gtf_file)
 	intervals = HTSeq.GenomicArrayOfSets(chroms="auto", stranded=True)
 	transcripts = hash()
-	for record in gtf:
-		try:
-			# Extract the necessary fields from the GTF record:
-			chrom, strand, gene_id, transcript_id = record.iv.chrom, record.iv.strand, record.attr["gene_id"], record.attr["transcript_id"]
-			if chrom in targets or len(targets) == 0:
-				if transcript_id in fpkms:
-					if fpkms[transcript_id] > 0.0:
-						biotype_field = "gene_biotype" if "gene_biotype" in record.attr.keys() else "gene_type" if "gene_type" in record.attr.keys() else str()
-						if record.attr[biotype_field] == "protein_coding":
-							if record.type in ("CDS", "stop_codon"):
-								if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"], list):
-									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"].append(record.iv)
-								else:
-									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"] = [record.iv]
-								intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "CDS"])
-							elif record.type == "UTR":
-								if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"], list):
-									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"].append(record.iv)
-								else:
-									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"] = [record.iv]
-								intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "UTR"])
-						else:
-							if record.type == "exon":
-								if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"], list):
-									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"].append(record.iv)
-								else:
-									transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"] = [record.iv]
-								intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "exon"])
-		except KeyError:
-			pass
+	try:
+		for record in gtf:
+			try:
+				# Extract the necessary fields from the GTF record:
+				chrom, strand, gene_id, transcript_id = record.iv.chrom, record.iv.strand, record.attr["gene_id"], record.attr["transcript_id"]
+				if chrom in targets or len(targets) == 0:
+					if transcript_id in fpkms:
+						if fpkms[transcript_id] > 0.0:
+							biotype_field = "gene_biotype" if "gene_biotype" in record.attr.keys() else "gene_type" if "gene_type" in record.attr.keys() else str()
+							if record.attr[biotype_field] == "protein_coding":
+								if record.type in ("CDS", "stop_codon"):
+									if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"], list):
+										transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"].append(record.iv)
+									else:
+										transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["CDS"] = [record.iv]
+									intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "CDS"])
+								elif record.type == "UTR":
+									if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"], list):
+										transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"].append(record.iv)
+									else:
+										transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["UTR"] = [record.iv]
+									intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "UTR"])
+							else:
+								if record.type == "exon":
+									if isinstance(transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"], list):
+										transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"].append(record.iv)
+									else:
+										transcripts[record.attr[biotype_field]][chrom][strand][gene_id][transcript_id]["exon"] = [record.iv]
+									intervals[record.iv] += ":".join([record.attr[biotype_field], chrom, strand, gene_id, transcript_id, "exon"])
+			except KeyError:
+				pass
+	except ValueError:
+		print "parse_gtf():"
+		print record.iv
+		print record.attr
 	logger.info("parse_gtf(): Parsing transcript coordinates from GTF: " + gtf_file + " into memory... [COMPLETE]")
 	# Return the parsed GFF_Reader() object, the GenomicIntervals() array, and the parsed GTF:
 	return gtf, intervals, partition_utrs(transcripts)
@@ -424,23 +429,28 @@ class Coverage(object):
 		# object. This results in a hashed coverage object of GenomicIntervals with the
 		# read length and number stored as tuples in the set() array.
 		coverage = HTSeq.GenomicArrayOfSets(chroms="auto", stranded=True)
-		for read in self.bam:
-			# Extract the read chromosome and strand from the GenomicInterval of the read:
-			read_chrom = read.iv.chrom
-			read_strand = read.iv.strand
-			if read_chrom in self.targets or len(self.targets) == 0:
-				# Based on the CIGAR string of the read, convert the aligned read position to its
-				# A-Site offset position:
-				name = read.get_sam_line().split("\t")[0] + "|" + str(len(read.get_sam_line().split("\t")[9]))
-				offset = self.calculate_offset_position(self.asite_offsets, len(read.get_sam_line().split("\t")[9]))
-				if read_strand == "+":
-					reference_start = convert_cigar_to_reference_coordinates(read.cigar)[offset - 1]
-					reference_end = convert_cigar_to_reference_coordinates(read.cigar)[offset]
-				else:
-					reference_start = convert_cigar_to_reference_coordinates(read.cigar)[-offset - 1]
-					reference_end = convert_cigar_to_reference_coordinates(read.cigar)[-offset]
-				# Add the A-site offset position as a 1-base length GenomicInterval in the coverage array:
-				coverage[HTSeq.GenomicInterval(read_chrom, reference_start, reference_end, read_strand)] += name
+		try:
+			for read in self.bam:
+				# Extract the read chromosome and strand from the GenomicInterval of the read:
+				read_chrom = read.iv.chrom
+				read_strand = read.iv.strand
+				if read_chrom in self.targets or len(self.targets) == 0:
+					# Based on the CIGAR string of the read, convert the aligned read position to its
+					# A-Site offset position:
+					name = read.get_sam_line().split("\t")[0] + "|" + str(len(read.get_sam_line().split("\t")[9]))
+					offset = self.calculate_offset_position(self.asite_offsets, len(read.get_sam_line().split("\t")[9]))
+					if read_strand == "+":
+						reference_start = convert_cigar_to_reference_coordinates(read.cigar)[offset - 1]
+						reference_end = convert_cigar_to_reference_coordinates(read.cigar)[offset]
+					else:
+						reference_start = convert_cigar_to_reference_coordinates(read.cigar)[-offset - 1]
+						reference_end = convert_cigar_to_reference_coordinates(read.cigar)[-offset]
+					# Add the A-site offset position as a 1-base length GenomicInterval in the coverage array:
+					coverage[HTSeq.GenomicInterval(read_chrom, reference_start, reference_end, read_strand)] += name
+		except AttributeError:
+			print "Coverage/asite_coverage():"
+			print read
+			print read.iv
 		return coverage
 
 ########################################
