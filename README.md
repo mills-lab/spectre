@@ -6,12 +6,13 @@ This software is designed to identify regions of active translation from ribosom
 ##Required Resources:
 ```
 R:			https://www.r-project.org/
-Rpy:		http://rpy.sourceforge.net
-ROCR:		https://rocr.bioinf.mpi-sb.mpg.de/
-Python:		https://www.python.org/
-bx-python:	https://bitbucket.org/james_taylor/bx-python/wiki/Home
-samtools:	http://samtools.sourceforge.net/
-```
+Rpy:			http://rpy.sourceforge.net
+ROCR:                   https://rocr.bioinf.mpi-sb.mpg.de/```
+Python:			https://www.python.org
+HTSeq:			https://pypi.python.org/pypi/HTSeq
+NumPy:			https://pypi.python.org/pypi/numpy              
+pysam:			https://pypi.python.org/pypi/pysam/
+pyfasta:		https://pypi.python.org/pypi/pyfasta/
 
 ##Quick Start
 Download and Install:
