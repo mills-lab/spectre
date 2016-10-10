@@ -5,7 +5,7 @@ This software is designed to identify regions of active translation from ribosom
 
 ##Required Resources:
 ```
-R:		https://www.r-project.org/
+R:			https://www.r-project.org/
 Rpy:		http://rpy.sourceforge.net
 ROCR:		https://rocr.bioinf.mpi-sb.mpg.de/
 Python:		https://www.python.org
