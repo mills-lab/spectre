@@ -1207,7 +1207,8 @@ def print_metrics(output_file, transcript_stats, experiment_stats, reference_dis
 	else:
 		output_file.write("# FILE I/O:" + write_parameters(parameters, analyses))
 		output_file.write("\n# METRICS:" + write_experiment_metrics(experiment_stats))
-		output_file.write("\n" + str(zip(*reference_distribution.items())))
+		if isinstance(reference_distribution, dict):
+			output_file.write("\n" + str(zip(*reference_distribution.items())))
 	output_file.write(header)
 
 	count = 1
