@@ -109,12 +109,15 @@ def check_chromosomes(bam_file, gtf_file, cufflinks_file, target_chroms):
 		return sorted(chroms)
 
 	def get_target_chroms(targets):
-		return [str(chrom) for chrom in targets.split(",")]
+		if targets:
+			return [str(chrom) for chrom in targets.split(",")]
+		else:
+			return ""
 
-	if all(chrom in get_bam_chroms(bam_file) for chrom in get_gtf_chroms(gtf_file) for chrom in get_cufflinks_chroms(cufflinks_file) for chrom in get_target_chroms(target_chroms)):
-		return True
+	if get_target_chroms(target_chroms):
+		return True if all(chrom in get_bam_chroms(bam_file) for chrom in get_gtf_chroms(gtf_file) for chrom in get_cufflinks_chroms(cufflinks_file) for chrom in get_target_chroms(target_chroms)) else False
 	else:
-		return False
+		return True if all(chrom in get_bam_chroms(bam_file) for chrom in get_gtf_chroms(gtf_file) for chrom in get_cufflinks_chroms(cufflinks_file)) else False
 
 def convert_cigar_to_reference_coordinates(cigar):
 	coordinates = list()
