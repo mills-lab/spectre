@@ -87,13 +87,6 @@ def check_input_chromosomes(bam, gtf, exp, targets):
         else:
             return True if all(chrom in get_bam_chroms(bam) for chrom in get_gtf_chroms(gtf)) else False
 
-def convert_cigar_to_reference_coordinates(cigar):
-    # Convert CIGAR string into positional operations:
-    coordinates = list()
-    for op in cigar:
-        if not op.type == "N":
-            coordinates.extend(range(op.ref_iv.start, op.ref_iv.end))
-    return sorted(set(coordinates))
 
 def extract_coverage_over_interval(coverage, interval):
     # Extract read coverage by position over a GenomicInterval():
@@ -112,12 +105,9 @@ def calculate_normalized_coverage(coverage, library_size):
     # Calculate the depth in reads per million mapped reads by position:
     return [cov/library_size/1e6 for cov in coverage]
 
-# DEPRECATED
-#def format_feature(feature):
-#    return "CDS" if feature == "exon" else "UTR" if "UTR" in feature else feature
-
-# TRANSCRIPTION ANNOTATION
-###########################
+############################
+# TRANSCRIPTION ANNOTATION #
+############################
 def parse_ensembl_gtf(annotation_file, targets):
     # This function takes as input a user-supplied GTF transcript annotation file
     # and extracts the CDS and UTR intervals of transcripts, and the start and
@@ -282,4 +272,28 @@ def parse_known_gene(annotation_file, targets):
             print("[ERROR] Record " + record["name"] + " in " + annotation_file + " is not formatted correctly for parsing.")
     return(annotations, intervals)
 
-
+def convert_coverage(alignments, offsets, target):
+    # Take as input a BAM file of read alignments, and convert the position of aligned
+    # reads to their offset position in the form of an HTSeq.GenomicArray() object:
+    def calculate_offset(read_length, offsets):
+        return offsets[read_length] if read_length in offsets else int(read_length / 2)
+    def convert_cigar_to_reference_coordinates(cigar):
+        # Convert CIGAR string into coordinates based on encoded operations:
+        coordinates = list()
+        for op in cigar:
+            if not op.type == "N":
+                coordinates.extend(range(op.ref_iv.start, op.ref_iv.end))
+        return(sorted(set(coordinates)))    
+    def extract_offset_position(coords, offset, strand):
+        return coords[(offset-1)] if strand == "+" else coords[-offset]
+    # Initialize the GenomicArray():
+    array = HTSeq.GenomicArray(chroms="auto", stranded=True, typecode="i", storage="step")
+    if target:
+        array = HTSeq.GenomicArray(chroms=target, stranded=True, typecode="i", storage="step")
+    for read in alignments:
+        try:
+            array[HTSeq.GenomicPosition(read.iv.chrom, extract_offset_position(convert_cigar_to_reference_coordinates(read.cigar), 
+                calculate_offset(len(read.read_as_aligned.seq), offsets), read.iv.strand), read.iv.strand)] += 1
+        except:
+            print("[ERROR] Parsing of alignment failed:", read.iv)
+    return array
