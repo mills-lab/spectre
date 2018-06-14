@@ -1,9 +1,9 @@
-#SPECtre
+# SPECtre
 
-##Description
+## Description
 This software is designed to identify regions of active translation from ribosome profiling sequence data. This analytical pipeline scores the translational status of each annotated region (5'UTR, CDS, exon, 3'UTR) as a function of its spectral coherence over user-defined N nucleotide sliding windows to an idealized reference coding signal. It is used by calling *SPECtre.py* with the listed parameters.
 
-##Required Resources:
+## Required Resources:
 ```
 R:			https://www.r-project.org/
 Rpy:		http://rpy.sourceforge.net
@@ -15,7 +15,7 @@ pysam:		https://pypi.python.org/pypi/pysam/
 pyfasta:	https://pypi.python.org/pypi/pyfasta/
 ```
 
-##Quick Start
+## Quick Start
 Download and Install:
 ```
 git clone git@github.com:mills-lab/spectre.git
@@ -38,20 +38,20 @@ python SPECtre.py \
 	--gtf <ensembl.gtf>
 ```
 
-##Supporting Files
+## Supporting Files
 Sample BAM alignment file, Cufflinks output, and Ensembl-formatted GTF are available for testing purposes in the folder *test*.
 
-##Output
+## Output
 *SPECtre* outputs transcript-level and experiment-level translational metrics in tab-delimited text format. Example output is shown in the folder *test*.
 
-##Usage
+## Usage
 ```
 python SPECtre.py [parameters]
 ```
 
-###Parameters:
+### Parameters:
 
-####Required File Arguments:
+#### Required File Arguments:
 ```
 	--input, alignment file in BAM format
 	--output, file to output results
@@ -60,7 +60,7 @@ python SPECtre.py [parameters]
 	--gtf, location of annotation file in GTF format (only Ensembl supported currently)
 ```
 
-####User-defined Analytical Arguments:
+#### User-defined Analytical Arguments:
 ```
 	--nt <INTEGER>, number of threads for multi-processing (default: 1)
 	--len <INTEGER>, length in nucleotides of sliding window for SPECtre analysis (default: 30 nt)
@@ -73,14 +73,14 @@ python SPECtre.py [parameters]
 
 ```
 
-####Optional Arguments:
+#### Optional Arguments:
 ```
 	--full, enables calculation of un-windowed spectral coherence over full length of transcript
 	--floss, enables calculation of FLOSS metric (Ingolia, 2014) for each transcript
 	--orfscore, enables calculation of ORFscore (Bazzini, 2014) for each transcript
 ```
 
-##Test Data:
+## Test Data:
 Test data is derived from ribosome profiling of human SH-SY5Y cells and limited to a single chromosome (3) for space allocation purposes. Similarly, the *.fpkm_tracking input file and test GTF are limited to a single choromosome. To run test analysis with default parameters:
 ```
 python SPECtre.py \
@@ -94,17 +94,17 @@ python SPECtre.py \
 	--orfscore
 ```
 
-##Example Analytical Pipeline:
+##E xample Analytical Pipeline:
 Example SPECtre analysis of mESC (Ingolia, 2014) ribosome profiling data.
 
-###Download Required Sequence and Annotation Files
-####Transcript GTF:
+### Download Required Sequence and Annotation Files
+#### Transcript GTF:
 ```
 	ftp://ftp.ensembl.org/pub/release-78/gtf/mus_musculus/
 	
 	Download the archived Mus_musculus.GRCm38.78.gtf file.
 ```
-####Reference FASTAs:
+#### Reference FASTAs:
 ```
 	ftp://ftp.ensembl.org/pub/release-78/fasta/mus_musculus/dna/
 	
@@ -113,7 +113,7 @@ Example SPECtre analysis of mESC (Ingolia, 2014) ribosome profiling data.
 	
 	Individual chromosome FASTA files may be concatenated for ease-of-use by downstream applications (see: Index Genomic FASTAs)
 ```
-####rRNA Contaminant FASTA:
+#### rRNA Contaminant FASTA:
 ```
 	wget ftp://igenome:G3nom3s4u@ussd-ftp.illumina.com/Mus_musculus/UCSC/mm10/Mus_musculus_UCSC_mm10.tar.gz
 
@@ -121,48 +121,48 @@ Example SPECtre analysis of mESC (Ingolia, 2014) ribosome profiling data.
 ```
 Note the directory location of these files for future steps.
 
-###Index Genomic and Ribosomal Sequences
-####Index Genomic FASTAs:
+### Index Genomic and Ribosomal Sequences
+#### Index Genomic FASTAs:
 ```
 	bowtie-build <reference_fasta_files> <genomic_index_name>
 	
 	If TopHat2 is required for alignment, bowtie2 indexes must also be built.
 ```
-####Index rRNA Contaminants:
+#### Index rRNA Contaminants:
 ```
 	bowtie-build <rRNA_fasta_files> <rRNA_index_name>
 ```
 
-###Library Pre-processing and Alignment
-####Remove Adapters and Trim Library Sequences:
+### Library Pre-processing and Alignment
+#### Remove Adapters and Trim Library Sequences:
 ```
 	fastx_clipper -Q33 -a CTGTAGGCACCATCAAT -l 24 -c -n –v -i <fastq_file> 2> logs/<log_file> > <library_clipped.fastq>
 	fastx_trimmer -Q33 -f 2 -m 24 -i <library_clipped.fastq> > <library_trimmed.fastq>
 	
 	fastx_clipper and fastx_trimmer are part of the FASTX Toolkit (http://hannonlab.cshl.edu/fastx_toolkit/)
 ```
-####Align Trimmed Sequences to rRNA Contaminant Database:
+#### Align Trimmed Sequences to rRNA Contaminant Database:
 ```
 	bowtie -p 8 -l 23 --solexa-quals --maqerr=60 -S --un <unmapped_reads.fastq> /path/to/<rRNA_index_name> /path/to/<library_trimmed.fastq> 2>> path/to/<log_file> > <rRNA_reads.sam>
 ```
-####Align to Genome and Transcript GTF:
+#### Align to Genome and Transcript GTF:
 ```
 	tophat -p 8 --bowtie1 --solexa-quals --GTF /path/to/Mus_musculus.GRCm38.78.gtf --no-novel-juncs --library-type fr-unstranded -o /path/to/output /path/to/<genomic_index_name> /path/to/<unmapped_reads.fastq>
 ```
 
-###Alignment QC and Abundance Estimation
-####Filter Alignments Based on Quality:
+### Alignment QC and Abundance Estimation
+#### Filter Alignments Based on Quality:
 ```
 	samtools view -b -q 10 /path/to/tophat/<accepted_hits.bam> > <filtered_hits.bam>
 ```
-####Estimated RPF Abundance Over Transcripts:
+#### Estimated RPF Abundance Over Transcripts:
 ```
 	cufflinks -p 4 -o /path/to/output -g /path/to/Mus_musculus.GRCm38.78.gtf /path/to/<filtered_hits.bam>
 	
 	Alternatively, the -G/--GTF argument may be used instead of -g to estimate abundance only against transcripts annotated in the GTF.
 ```
 
-###SPECtre Analysis
+### SPECtre Analysis
 ```
 	# CALCULATE CUSTOM P-SITE OFFSETS (IF NECESSARY):
 	python calculate_psite_offsets.py /path/to/Mus_musculus.GRCm38.78.gtf /path/to/<filtered_hits.bam>
@@ -190,7 +190,7 @@ Note the directory location of these files for future steps.
 		--orfscore
 		--full
 ```
-####Expected Output:
+#### Expected Output:
 ```
 	Results will be output to the designated file with the general format defined by the number and types of additional analyses requested, for example:
 
