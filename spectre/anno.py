@@ -120,15 +120,6 @@ A sample mapping file of UCSC identifiers to gene symbol and ENSG locus identifi
 
 """
 
-# Import standard libraries:
-import operator
-import itertools
-
-# Import third-party libraries:
-import HTSeq as hts
-import pandas as pd
-import numpy as np
-
 # Import SPECtre utilities:
 from utils import *
 
@@ -154,176 +145,6 @@ annotation_datatypes = [np.dtype('unicode_'),np.dtype('unicode_'),np.dtype('unic
 known_gene_fields = ['name','chrom','strand','tx_start','tx_end','cds_start','cds_end','exon_count',
 	'exon_starts','exon_ends','protein_id','align_id']
 
-def parse_regions_from_exons(region=None, row=None):
-	"""Parse coding and non-coding regions from exon coordinates.
-	
-	This function takes in an individual transcript in the form of an annotation DataFrame
-	row, and parses the exon starts and ends into a continiguous coordinate chain, then
-	partitions the coordinates into the 5'UTR, CDS, and 3'UTR based on the annotated CDS
-	start and end coordinates.
-	"""
-	coordinates = None
-	if not all([region is not None, row is not None]):
-		pass
-	else:
-		try:
-			# Attempt to build the coordinate chain from the exon starts and ends:
-			exon_chain = expand_exons_to_chain(list(zip(convert_coordinates(row.exon_starts), 
-				convert_coordinates(row.exon_ends))))
-			if not exon_chain:
-				raise ValueError('Exon conversion to coordinates chain failed')
-		except ValueError:
-			pass
-		if region == 'utr5_starts':
-			coordinates = None if row.cds_start == row.cds_end else (','.join([str(start) for start, end in 
-				collapse_chain_to_ranges([pos for pos in exon_chain if pos < int(row.cds_start)])]))
-		if region == 'utr5_ends':
-			coordinates = None if row.cds_start == row.cds_end else (','.join([str(end) for start, end in 
-				collapse_chain_to_ranges([pos for pos in exon_chain if pos < int(row.cds_start)])]))
-		if region == 'cds_starts':
-			coordinates = (','.join([str(start) for start, end in collapse_chain_to_ranges([pos for pos 
-				in exon_chain])])) if row.cds_start == row.cds_end else (','.join([str(start) for start, end 
-					in collapse_chain_to_ranges([pos for pos in exon_chain if (pos >= int(row.cds_start) and pos <= 
-						int(row.cds_end))])]))
-		if region == 'cds_ends':
-			coordinates = (','.join([str(end) for start, end in collapse_chain_to_ranges([pos for pos 
-				in exon_chain])])) if row.cds_start == row.cds_end else (','.join([str(end) for start, end 
-					in collapse_chain_to_ranges([pos for pos in exon_chain if (pos >= int(row.cds_start) and pos <= 
-						int(row.cds_end))])]))
-		if region == 'utr3_starts':
-			coordinates = None if row.cds_start == row.cds_end else (','.join([str(start) for start, end in 
-				collapse_chain_to_ranges([pos for pos in exon_chain if pos > int(row.cds_end)])]))
-		if region == 'utr3_ends':
-			coordinates = None if row.cds_start == row.cds_end else (','.join([str(end) for start, end in 
-				collapse_chain_to_ranges([pos for pos in exon_chain if pos > int(row.cds_end)])]))
-	return None if not coordinates else coordinates
-
-def add_ensembl_record(record=None, database=None, cols=None):
-	"""Adds an Ensembl-formatted record into the transcript annotation database.
-
-	This function parses an Ensembl GTF annotation file and extracts transcript coordinate
-	information into a DataFrame object. Transcript records are first scanned for a valid
-	'transcript_id' attribute, then parsed according to the type of record. Start and stop
-	codons are annotated to each transcript, and exon coordinates are appended to a transient
-	'exon_starts' and 'exon_ends' column, from which CDS coordinates are inferred at a later
-	point in the transcript annotation pipeline.
-	"""
-	
-	def get_transcript_type(record):
-		return 'biotype' if 'transcript_biotype' in record.attr else 'type' if 'transcript_type' in record.attr else None
-	
-	def modify_transcript(rec=None, db=None):
-		try:
-			if not all([rec is not None, db is not None]):
-				raise ValueError('Missing record or database input')
-			else:
-				if rec.type == 'start_codon':
-					# Since CDS start and end coordinates are reported according to strand:
-					if rec.iv.strand == '+':
-						db.cds_start[db.transcript_id == rec.attr['transcript_id']] = rec.iv.start
-					else:
-						db.cds_end[db.transcript_id == rec.attr['transcript_id']] = rec.iv.end
-				elif rec.type == 'stop_codon':
-					if rec.iv.strand == '+':
-						db.cds_end[db.transcript_id == rec.attr['transcript_id']] = rec.iv.end
-					else:
-						db.cds_start[db.transcript_id == rec.attr['transcript_id']] = rec.iv.start
-				elif rec.type == 'exon':
-					# Exon coordinates to be re-sorted later:
-					if not db.exon_starts[db.transcript_id == rec.attr['transcript_id']].values[0]:
-						db.exon_starts[db.transcript_id == rec.attr['transcript_id']] = (
-							str(rec.iv.start))
-						db.exon_ends[db.transcript_id == rec.attr['transcript_id']] = (
-							str(rec.iv.end))
-					else:
-						db.exon_starts[db.transcript_id == rec.attr['transcript_id']] += (
-							',' + str(rec.iv.start))
-						db.exon_ends[db.transcript_id == rec.attr['transcript_id']] += (
-							',' + str(rec.iv.end))
-				else:
-					pass
-		except ValueError:
-			pass
-		return db
-	try:
-		if not all([record is not None, database is not None]):
-			raise ValueError('Invalid record or database input')
-		else:
-			if 'transcript_id' in record.attr:
-				# Only records with a transcript_id attribute are to be parsed:
-				if not (database.transcript_id.any() == record.attr['transcript_id']) and record.type == 'transcript':
-					database = database.append(dict(zip(cols, [
-						record.attr['gene_name'],
-						record.attr['gene_id'],
-						record.attr['transcript_id'],
-						record.attr['gene_' + get_transcript_type(record)],
-						record.attr['transcript_' + get_transcript_type(record)],
-						record.source,
-						record.iv.chrom,
-						record.iv.strand,
-						record.iv.start,
-						record.iv.end,
-						record.iv.start,
-						record.iv.end,
-						str(),
-						str(),
-						str(),
-						str(),
-						str(),
-						str(),
-						str(),
-						str()])), ignore_index=True)
-				else:
-					database = modify_transcript(rec=record, db=database)
-	except ValueError:
-		pass
-	return database
-
-def add_ucsc_record(record=None, database=None, cols=None):
-	"""Adds a UCSC record into the transcript annotation database.
-
-	This function parses an UCSC knownGene transcript annotation file into a DataFrame object
-	for scoring by SPECtre. Since UCSC knownGene records are contained within a single line,
-	much of the annotation parsing is comprised of transferring them into the DataFrame and
-	parsing out 5'UTR, CDS, and 3'UTR coordinates.
-	"""
-
-	def get_transcript_type(rec):
-		return 'non_coding' if rec['cds_start'] == rec['cds_end'] else 'protein_coding'
-	try:
-		# UCSC transcripts are contained within a single line:
-		if all([record, database is not None]):
-			if not database.transcript_id.any() == record['name']:
-				# Add the gene to the database:
-				database = database.append(dict(zip(cols, [
-					record['protein_id'],
-					None,
-					record['name'],
-					get_transcript_type(record),
-					get_transcript_type(record),
-					'UCSC',
-					record['chrom'],
-					record['strand'],
-					record['tx_start'],
-					record['tx_end'],
-					record['cds_start'],
-					record['cds_end'],
-					record['exon_starts'][:-1], # Strips trailing comma
-					record['exon_ends'][:-1], # Strips trailing comma
-					str(),
-					str(),
-					str(),
-					str(),
-					str(),
-					str()])), ignore_index=True)
-			else:
-				raise ValueError('Transcript already exists in database')
-		else:
-			raise NameError('Invalid record or database input')
-	except (NameError, ValueError):
-		pass
-	return database
-
 def load_ensembl_annotations(infile=None):
 	"""Loads Ensembl-formatted transcript annotations to a database.
 
@@ -335,20 +156,6 @@ def load_ensembl_annotations(infile=None):
 	by the Ensembl consortium.
 	"""
 	
-	def reorder_coordinates(region=None, row=None):
-		try:
-			if all([region is not None, row is not None]):
-				if region == 'exon_starts':
-					ordered = ','.join([str(pos) for pos in sorted([int(pos) for pos in row['exon_starts'].split(',')])])
-				if region == 'exon_ends':
-					ordered = ','.join([str(pos) for pos in sorted([int(pos) for pos in row['exon_ends'].split(',')])])
-				if not ordered:
-					raise ValueError('Coordinates could not be re-ordered based on input')
-			else:
-				raise ValueError('Invalid coordinates input')
-		except ValueError:
-			return None
-		return ordered
 	# Initialize a DataFrame with gene- and transcript-level information:
 	db = initialize_annotation_dataframe(columns=annotation_fields, dtypes=annotation_datatypes)
 	try:
@@ -398,22 +205,6 @@ def load_ucsc_annotations(infile=None, mapfile=None):
 	folder for sample hg38-Ensembl mappings.
 	"""
 	
-	def map_gene_name(mappings=None, row=None):
-		# Maps UCSC identifiers to a designated gene identifier and symbol:
-		mapped = None
-		if all([mappings is not None, row is not None]):
-			if row.transcript_id in mappings.ucsc.values:
-				mapped = mappings.symbol[mappings.ucsc == row.transcript_id].values[0]
-		return mapped
-	
-	def map_gene_id(mappings=None, row=None):
-		# Maps UCSC identifiers to a designated gene identifier and symbol:
-		mapped = None
-		if all([mappings is not None, row is not None]):
-			if row.transcript_id in mappings.ucsc.values:
-				mapped = mappings.ensembl[mappings.ucsc == row.transcript_id].values[0]
-		return mapped
-	
 	# Initialize a DataFrame with gene- and transcript-level information"
 	try:
 		db = initialize_annotation_dataframe(columns=annotation_fields, dtypes=annotation_datatypes)
@@ -453,6 +244,7 @@ def load_ucsc_annotations(infile=None, mapfile=None):
 		del(ucsc_mappings)
 	return db
 
-map_file = '/mnt/c/Users/stonyc/Documents/repos/spectre/spectre/data/hg38toEnsembl.txt'
-ensembl_gtf_file = '/home/stonyc/references/ensembl/v78/annotation/test.gtf'
-known_genes_file = '/home/stonyc/references/hg38/annotation/knownTest.txt'
+# Used for testing purposes:
+#map_file = '/mnt/c/Users/stonyc/Documents/repos/spectre/spectre/data/hg38toEnsembl.txt'
+#ensembl_gtf_file = '/home/stonyc/references/ensembl/v78/annotation/test.gtf'
+#known_genes_file = '/home/stonyc/references/hg38/annotation/knownTest.txt'
