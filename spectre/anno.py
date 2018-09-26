@@ -59,7 +59,7 @@ as follows:
 	5. transcript_type - transcript type annotation
 	6. source - data source or name of program that generated this item
 	7. chrom - reference sequence chromosome or scaffold
-	8. strand - one of '+' for forward, or '-' for minus
+	8. strand - one of '+' for forward, or '-' for reverse
 	9. start - equivalent to UCSC txStart
 	10. end - equivalent to UCSC txEnd
 	11. cds_start - equivalent to UCSC cdsStart
@@ -178,8 +178,8 @@ def load_ensembl_annotations(infile=None):
 	db.utr3_ends = db.apply(lambda x: parse_regions_from_exons(region='utr3_ends', row=x), axis=1)
 	db.cds_ends = db.apply(lambda x: parse_regions_from_exons(region='cds_ends', row=x), axis=1)
 	# Exon start and end coordinates are no longer needed:
-	db.drop('exon_starts', axis=1, inplace=True)
-	db.drop('exon_ends', axis=1, inplace=True)
+	# db.drop('exon_starts', axis=1, inplace=True)
+	# db.drop('exon_ends', axis=1, inplace=True)
 	# Remove the GTF from memory:
 	if gtf:
 		del(gtf)
@@ -237,8 +237,8 @@ def load_ucsc_annotations(infile=None, mapfile=None):
 		db.gene_name = db.apply(lambda x: map_gene_name(mappings=ucsc_mappings, row=x), axis=1)
 		db.gene_id = db.apply(lambda x: map_gene_id(mappings=ucsc_mappings, row=x), axis=1)
 	# Exon start and end coordinates are no longer needed:
-	db.drop('exon_starts', axis=1, inplace=True)
-	db.drop('exon_ends', axis=1, inplace=True)
+	# db.drop('exon_starts', axis=1, inplace=True)
+	# db.drop('exon_ends', axis=1, inplace=True)
 	# Remove UCSC-Ensembl mappings from memory:
 	if ucsc_mappings is not None:
 		del(ucsc_mappings)

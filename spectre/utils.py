@@ -90,6 +90,32 @@ def expand_exons_to_chain(exons=None):
     except:
         return None
 
+def extract_region_chain(row=None, region=None):
+    """Calculate the length of a region using the start and end coordinates.
+
+    """
+    try:
+        if all([row is not None, region is not None]):
+            if region == 'gene':
+                region_chain = expand_exons_to_chain(list(zip(convert_coordinates(row.exon_starts),
+                    convert_coordinates(row.exon_ends))))
+            elif region == '5UTR':
+                region_chain = expand_exons_to_chain(list(zip(convert_coordinates(row.utr5_starts),
+                    convert_coordinates(row.utr5_ends))))
+            elif region == '3UTR':
+                region_chain = expand_exons_to_chain(list(zip(convert_coordinates(row.utr5_starts),
+                    convert_coordinates(row.utr5_ends))))
+            elif region == 'CDS':
+                region_chain = expand_exons_to_chain(list(zip(convert_coordinates(row.utr5_starts),
+                    convert_coordinates(row.utr5_ends))))
+            else:
+                raise TypeError('Invalid region input')
+        else:
+            raise ValueError('Missing row or region input')
+    except (TypeError, ValueError):
+        return None
+    return region_chain
+
 def parse_custom_offsets(offsets_file=None, default=None):
     """Adds custom read position offsets.
 
@@ -382,7 +408,7 @@ def initialize_coverage_dataframe(database=None):
     """
     try:
         if database is not None:
-            coverage = database.transcript_id
+            coverage = database[['transcript_id', 'transcript_type', 'utr5_starts', 'cds_starts', 'utr3_starts']]
             # Add columns for 5'UTR, CDS, 3'UTR, and raw and normalized coverage:
             coverage.utr5_raw = None
             coverage.utr3_raw = None
@@ -482,70 +508,32 @@ def calculate_normalized_coverage(row=None, region=None, mapped_reads=None):
         return None
     return ','.join([str(nd) for nd in normalized])
 
-def initialize_tpm_dataframe(database=None):
-    """Initialize a dataframe for the calculate TPMs.
-
-    """
-    try:
-        if database is not None:
-            tpms = database[['transcript_id', 'transcript_type', 'utr5_starts', 'cds_starts', 'utr3_starts']]
-            # Add length and read count columns for 5'UTR, CDS, 3'UTR:
-            tpms.gene_length = None
-            tpms.utr5_length = None
-            tpms.utr3_length = None
-            tpms.cds_length = None
-            tpms.gene_count = None
-            tpms.utr5_count = None
-            tpms.utr3_count = None
-            tpms.cds_count = None
-        else:
-            raise ValueError('Missing database input')
-    except ValueError:
-        return None
-    return tpms
-
 def calculate_region_length(row=None, region=None):
-    """Calculate the length of a region using the start and end coordinates.
+    try:
+        if all([row is not None, region is not None]):
+            region_chain = extract_region_chain(row=row, region=region)
+        else:
+            raise ValueError('Missing row or region input')
+    except ValueError:
+        return 0
+    return len(region_chain)
+
+def extract_read_counts_in_region(row=None, region=None):
+    """For a given transcript/row, extract the number of reads in each region from the coverage database.
 
     """
     try:
         if all([row is not None, region is not None]):
             if region == '5UTR':
-                region_chain = expand_exons_to_chain(list(zip(convert_coordinates(row.utr5_starts),
-                    convert_coordinates(row.utr5_ends))))
+                count = sum([int(n) for n in row.utr5_raw.split(',')])
             elif region == '3UTR':
-                region_chain = expand_exons_to_chain(list(zip(convert_coordinates(row.utr3_starts),
-                    convert_coordinates(row.utr3_ends))))
+                count = sum([int(n) for n in row.utr3_raw.split(',')])
             elif region == 'CDS':
-                region_chain = expand_exons_to_chain(list(zip(convert_coordinates(row.cds_starts),
-                    convert_coordinates(row.cds_ends))))
+                count = sum([int(n) for n in row.cds_raw.split(',')])
             else:
                 raise TypeError('Invalid region input')
         else:
             raise ValueError('Missing row or region input')
-    except (TypeError, ValueError):
-        return 0
-    return len(region_chain)
-
-def extract_read_counts_in_region(row=None, region=None, coverage_db=None):
-    """For a given transcript/row, extract the number of reads in each region from the coverage database.
-
-    """
-    try:
-        if all([row is not None, region is not None, coverage_db is not None]):
-            if coverage_db.transcript_id.any() == row.transcript_id:
-                if region == '5UTR':
-                    count = sum([int(n) for n in row.utr5_raw.split(',')])
-                elif region == '3UTR':
-                    count = sum([int(n) for n in row.utr3_raw.split(',')])
-                elif region == 'CDS':
-                    count = sum([int(n) for n in row.cds_raw.split(',')])
-                else:
-                    raise TypeError('Invalid region input')
-            else:
-                raise ValueError('Transcript not found')
-        else:
-            raise ValueError('Missing row, region or coverage database input')
     except (TypeError, ValueError):
         return 0
     return count
@@ -582,3 +570,44 @@ def calculate_tpm(database=None):
     except ValueError:
         pass
     return database
+
+def calculate_coherence(row=None, region=None):
+    """Calculate the Welch's coherence over a transcript or region.
+
+    """
+    try:
+        if all([row is not None, region is not None]):
+            region_chain = extract_region_chain(row=row, region=region)
+        else:
+            raise ValueError('Missing row or region input')
+    except ValueError:
+        return None
+    try:
+        # Instantiate the idealized signal, and truncate the signal to the length of the test region:
+        ideal_signal = ([4/6,1/6,1/6]*(math.ceil(len(region_chain)/3)))[:len(region_chain)]
+        if ideal_signal is not None:
+            if region == 'gene':
+                test_signal = [float(s) for s in row.gene_norm.split(',')]
+            elif region == '5UTR':
+                test_signal = [float(s) for s in row.utr5_norm.split(',')]
+            elif region == '3UTR':
+                test_signal = [float(s) for s in row.utr3_norm.split(',')]
+            elif region == 'CDS':
+                test_signal = [float(s) for s in row.cds_norm.split(',')]
+            else:
+                raise TypeError('Invalid region input')
+        else:
+            raise ValueError('Ideal signal could not be generated')
+    except (TypeError, ValueError):
+        return None
+    try:
+        f, Cxy = signal.coherence(test_signal, ideal_signal, nperseg=30, noverlap=27)
+        if all([f is not None, Cxy is not None]):
+            i = np.where(f == 1/3)
+            MSC = Cxy[i]
+        else:
+            raise ValueError('Could not calculate coherence from test/ideal inputs')
+    except ValueError:
+        return None
+    return MSC
+
