@@ -38,9 +38,11 @@ def initialize_annotation_dataframe(columns=None, dtypes=None, index=None):
             df = pd.DataFrame(index=index)
             for column, datatype in zip(columns, dtypes):
                 df[column] = pd.Series(dtype=datatype)
+            if df is None:
+                raise ValueError('Failure to initiate annotation dataframe')
         else:
-            raise NameError("Invalid inputs for database initialization")
-    except NameError:
+            raise NameError("Invalid inputs for dataframe initialization")
+    except (NameError, ValueError):
         return None
     return df
 
@@ -51,12 +53,15 @@ def convert_coordinates(coords=None):
     of integers.
     """
     try:
-        if coords == None:
-            raise ValueError('Invalid coordinate input')
+        if coords is not None:
+            converted = [int(pos) for pos in coords.split(',') if pos.isdigit()]
+            if not converted:
+                raise ValueError('Cooordinate conversion failed')
         else:
-            return [int(pos) for pos in coords.split(',') if pos.isdigit()]
+            raise ValueError('Invalid coordinates input')
     except ValueError:
         return None
+    return converted
 
 def collapse_chain_to_ranges(chain=None):
     """Convert a list of integer coordinates to a de-limited of start, end pairs.
@@ -65,16 +70,18 @@ def collapse_chain_to_ranges(chain=None):
     consecutive (start, end) coordinates.
     """
     try:
-        if chain == None:
-            raise ValueError('Invalid coordinate chain input')
-        else:
+        if chain is not None:
             ranges = list()
             for key, group in itertools.groupby(enumerate(chain), lambda i: i[0]-i[1]):
                 group = list(map(operator.itemgetter(1), group))
                 ranges.append((group[0], group[-1])) if len(group) > 1 else ranges.append(group[0])
-            return ranges
-    except ValueError():
+            if not ranges:
+                raise ValueError('Chain merge error')
+        else:
+            raise ValueError('Invalid coordinate chain input')
+    except ValueError:
         return None
+    return ranges
 
 def expand_exons_to_chain(exons=None):
     """Convert a list of (start, end) coordinates, into a chain.
@@ -83,12 +90,15 @@ def expand_exons_to_chain(exons=None):
     list() of consecutive integer coordinates.
     """
     try:
-        if exons == None:
-            raise ValueError('Missing exons or invalid input')
+        if exon is not None:
+            chain = list(itertools.chain(*[list(range(start, end+1)) for start, end in exons]))
+            if not chain:
+                raise ValueError('Exon expansion error')
         else:
-            return list(itertools.chain(*[list(range(start, end+1)) for start, end in exons]))
-    except:
+            raise ValueError('Missing or invalid exons input')
+    except ValueError:
         return None
+    return chain
 
 def extract_region_chain(row=None, region=None):
     """Calculate the length of a region using the start and end coordinates.
@@ -110,19 +120,33 @@ def extract_region_chain(row=None, region=None):
                     convert_coordinates(row.utr5_ends))))
             else:
                 raise TypeError('Invalid region input')
+            if not region:
+                raise ValueError('Chain extraction failure')
         else:
             raise ValueError('Missing row or region input')
     except (TypeError, ValueError):
         return None
     return region_chain
 
-def parse_custom_offsets(offsets_file=None, default=None):
+def load_alignment_file(infile=None):
+    try:
+        if infile is not None:
+            alignments = HTSeq.BAM_Reader(infile)
+            if not alignments:
+                raise ValueError('Could not parse BAM file input')
+        else:
+            raise ValueError('Missing BAM file input')
+    except ValueError:
+        return None
+    return alignments
+
+def parse_custom_offsets(offsets_file=None):
     """Adds custom read position offsets.
 
     """
-    if all(offsets_file is not None, default is not None):
-        try:
-            # Custom offsets found:
+    try:
+        if all(offsets_file is not None):
+        # Custom offsets found:
             read_lengths, read_offsets = list(), list()
             for line in open(offsets_file):
                 if all(n.isdigit() for n in line.strip().split('\t')):
@@ -130,37 +154,73 @@ def parse_custom_offsets(offsets_file=None, default=None):
                     read_lengths.append(int(line.strip().split('\t')[0]))
                     # Read offset is the second column:
                     read_offsets.append(int(line.strip().split('\t')[-1]))
-            default = dict(zip(read_lengths, read_offsets))
-        except:
-            pass
-    return default
+            offsets = dict(zip(read_lengths, read_offsets))
+            if not offsets:
+                raise ValueError('Could not parse offsets')
+        else:
+            raise ValueError('Missing offsets file input')
+    except:
+        return None
+    return offsets
+
+def count_mapped_reads(infile=None):
+    """Count the number of aligned reads in a BAM file.
+
+    """
+    try:
+        if infile is not None:
+            stdout = subprocess.Popen(['samtools', 'view', '-c', '-F', '0x904', infile], 
+                stdout=subprocess.PIPE)
+            if stdout:
+                output = stdout.communicate()
+                count = int(output[0])
+                if not count:
+                    raise ValueError('Invalid output error from subprocess output')
+            else:
+                raise ValueError('Invalid subprocess')
+        else:
+            raise ValueError('Missing BAM file input')
+    except ValueError:
+        return None
+    return count
 
 def check_input_chromosomes(bam_file=None, annotation_file=None, annotation_type=None):
     """Checks the format of chromosomes in input files.
 
     """
-    chroms_bam = ([re.findall("SN:\w{1,5}", line)[0].split(":")[-1] for line in
-        os.popen("samtools view -H " + bam_file) if "@SQ" in line] if bam_file else list())
-    chroms_anno = (list(set(line.strip() for line in os.popen("cut -f %s %s" % ("1" if annotation_type == "GTF"
-        else "2", annotation_file)) if "#" not in line)) if annotation_file else list())
-    # Check that the chromosomes from the BAM and annotation inputs were properly extracted:
-    assert len(bam_chroms) > 1, "Error in parsing chromosomes from your BAM input: %s" % (bam_file)
-    assert len(anno_chroms) > 1, "Error in parsing chromosomes from your annotation file: %s" % (annotation_file)
-    # Check that the the chromosomes from the BAM, annotation and targeted regions are consistent:
-    assert all(chrom in chroms_anno for chrom in chroms_bam), "Mismatch in input chromosomes."
+    try:
+        if all([bam_file is not None, annotation_file is not None]):
+            chroms_bam = ([re.findall("SN:\w{1,5}", line)[0].split(":")[-1] for line in
+                os.popen("samtools view -H " + bam_file) if "@SQ" in line] if bam_file else list())
+            chroms_anno = (list(set(line.strip() for line in os.popen("cut -f %s %s" % ("1" if annotation_type == "GTF"
+                else "2", annotation_file)) if "#" not in line)) if annotation_file else list())
+            if len(chroms_bam) >= 1 and len(chroms_anno) >= 1:
+                if all(chrom in chroms_anno for chrom in chroms_bam):
+                    check = True
+                else:
+                    raise ValueError('Mismatch in input chromosomes')
+            else:
+                raise ValueError('Chromosomes could not be parsed from input')
+        else:
+            raise ValueError('Missing BAM or annotation file input')
+    except ValueError:
+        return False
+    return check
 
 def convert_cigar_to_reference_coordinates(cigar=None):
     """Extracts the reference coordinates from an HTSeq CIGAR object.
 
     """
     try:
-        if not cigar:
-            raise ValueError('Missing CIGAR string input')
-        else:
+        if cigar is not None:
             coordinates = list()
             for op in cigar:
                 if not op.type == 'N':
                     coordinates.extend(list(range(op.ref_iv.start, op.ref_iv.end)))
+            if not coordinates:
+                raise ValueError('CIGAR conversion failure')
+        else:
+            raise ValueError('Missing or invalid CIGAR string input')
     except ValueError:
         return None
     return sorted(set(coordinates))
@@ -176,13 +236,15 @@ def offset_read_alignment_positions(bam=None, offsets=None):
     """
     try:
         if bam is not None:
-            coverage = HTSeq.GenomicArray(chroms='auto', stranded=True, typecode='i', storage='step')
+            coverage = hts.GenomicArray(chroms='auto', stranded=True, typecode='i', storage='step')
             for alignment in bam:
                 offset = (offsets[len(alignment.read.seq)] if len(alignment.read.seq) in offsets
                     else len(alignment.read.seq) // 2)
                 offset_pos = (convert_cigar_to_reference_coordinates(alignment.cigar)[offset-1] if alignment.iv.strand == '+'
                     else convert_cigar_to_reference_coordinates(alignment.cigar)[-offset])
                 coverage[HTSeq.GenomicPosition(alignment.iv.chrom, offset_pos, alignment.iv.strand)] += 1
+            if len(coverage.chrom_vectors) == 0:
+                raise ValueError('Alignment position offset failure')
         else:
             raise ValueError('Missing BAM input')
     except ValueError:
@@ -200,41 +262,42 @@ def parse_regions_from_exons(region=None, row=None):
     partitions the coordinates into the 5'UTR, CDS, and 3'UTR based on the annotated CDS
     start and end coordinates.
     """
-    coordinates = None
-    if not all([region is not None, row is not None]):
-        pass
-    else:
-        try:
-            # Attempt to build the coordinate chain from the exon starts and ends:
+    try:
+        if all([region is not None, row is not None]):
             exon_chain = expand_exons_to_chain(list(zip(convert_coordinates(row.exon_starts), 
                 convert_coordinates(row.exon_ends))))
-            if not exon_chain:
-                raise ValueError('Exon conversion to coordinates chain failed')
-        except ValueError:
-            pass
-        if region == 'utr5_starts':
-            coordinates = None if row.cds_start == row.cds_end else (','.join([str(start) for start, end in 
-                collapse_chain_to_ranges([pos for pos in exon_chain if pos < int(row.cds_start)])]))
-        if region == 'utr5_ends':
-            coordinates = None if row.cds_start == row.cds_end else (','.join([str(end) for start, end in 
-                collapse_chain_to_ranges([pos for pos in exon_chain if pos < int(row.cds_start)])]))
-        if region == 'cds_starts':
-            coordinates = (','.join([str(start) for start, end in collapse_chain_to_ranges([pos for pos 
-                in exon_chain])])) if row.cds_start == row.cds_end else (','.join([str(start) for start, end 
-                    in collapse_chain_to_ranges([pos for pos in exon_chain if (pos >= int(row.cds_start) and pos <= 
-                        int(row.cds_end))])]))
-        if region == 'cds_ends':
-            coordinates = (','.join([str(end) for start, end in collapse_chain_to_ranges([pos for pos 
-                in exon_chain])])) if row.cds_start == row.cds_end else (','.join([str(end) for start, end 
-                    in collapse_chain_to_ranges([pos for pos in exon_chain if (pos >= int(row.cds_start) and pos <= 
-                        int(row.cds_end))])]))
-        if region == 'utr3_starts':
-            coordinates = None if row.cds_start == row.cds_end else (','.join([str(start) for start, end in 
-                collapse_chain_to_ranges([pos for pos in exon_chain if pos > int(row.cds_end)])]))
-        if region == 'utr3_ends':
-            coordinates = None if row.cds_start == row.cds_end else (','.join([str(end) for start, end in 
-                collapse_chain_to_ranges([pos for pos in exon_chain if pos > int(row.cds_end)])]))
-    return None if not coordinates else coordinates
+            if exon_chain:
+                if region == 'utr5_starts':
+                    coordinates = None if row.cds_start == row.cds_end else (','.join([str(start) for start, end in 
+                        collapse_chain_to_ranges([pos for pos in exon_chain if pos < int(row.cds_start)])]))
+                if region == 'utr5_ends':
+                    coordinates = None if row.cds_start == row.cds_end else (','.join([str(end) for start, end in 
+                        collapse_chain_to_ranges([pos for pos in exon_chain if pos < int(row.cds_start)])]))
+                if region == 'cds_starts':
+                    coordinates = (','.join([str(start) for start, end in collapse_chain_to_ranges([pos for pos 
+                        in exon_chain])])) if row.cds_start == row.cds_end else (','.join([str(start) for start, end 
+                            in collapse_chain_to_ranges([pos for pos in exon_chain if (pos >= int(row.cds_start) and pos <= 
+                                int(row.cds_end))])]))
+                if region == 'cds_ends':
+                    coordinates = (','.join([str(end) for start, end in collapse_chain_to_ranges([pos for pos 
+                        in exon_chain])])) if row.cds_start == row.cds_end else (','.join([str(end) for start, end 
+                            in collapse_chain_to_ranges([pos for pos in exon_chain if (pos >= int(row.cds_start) and pos <= 
+                                int(row.cds_end))])]))
+                if region == 'utr3_starts':
+                    coordinates = None if row.cds_start == row.cds_end else (','.join([str(start) for start, end in 
+                        collapse_chain_to_ranges([pos for pos in exon_chain if pos > int(row.cds_end)])]))
+                if region == 'utr3_ends':
+                    coordinates = None if row.cds_start == row.cds_end else (','.join([str(end) for start, end in 
+                        collapse_chain_to_ranges([pos for pos in exon_chain if pos > int(row.cds_end)])]))
+                if not region:
+                    raise ValueError('Coordinate parsing from chain failure')
+            else:
+                raise ValueError('Expansion of ranges to chain failure')
+        else:
+            raise ValueError('Missing region or row input')
+    except ValueError:
+        return None
+    return coordinates
 
 def add_ensembl_record(record=None, database=None, cols=None):
     """Adds an Ensembl-formatted record into the transcript annotation database.
@@ -247,8 +310,18 @@ def add_ensembl_record(record=None, database=None, cols=None):
     point in the transcript annotation pipeline.
     """
     
-    def get_transcript_type(record):
-        return 'biotype' if 'transcript_biotype' in record.attr else 'type' if 'transcript_type' in record.attr else None
+    def get_transcript_type(record=None):
+        try:
+            if record is not None:
+                annotation = ('biotype' if 'transcript_biotype' in record.attr else 'type' 
+                    if 'transcript_type' in record.attr else None)
+                if not annotation:
+                    raise ValueError('Failure to parse bio|type from attributes')
+            else:
+                raise ValueError('Missing record input')
+        except ValueError:
+            return None
+        return annotation
     
     def modify_transcript(rec=None, db=None):
         try:
@@ -283,6 +356,7 @@ def add_ensembl_record(record=None, database=None, cols=None):
         except ValueError:
             pass
         return db
+
     try:
         if not all([record is not None, database is not None]):
             raise ValueError('Invalid record or database input')
@@ -402,22 +476,22 @@ def map_gene_id(mappings=None, row=None):
 ###########
 # SCORING #
 ###########
-def initialize_coverage_dataframe(database=None):
+def initialize_scoring_dataframe(database=None):
     """Initialize a dataframe for the calculated coverage.
 
     """
     try:
         if database is not None:
-            coverage = database[['transcript_id', 'transcript_type', 'utr5_starts', 'cds_starts', 'utr3_starts']]
+            scoring = database[['transcript_id', 'transcript_type', 'utr5_starts', 'cds_starts', 'utr3_starts']]
             # Add columns for 5'UTR, CDS, 3'UTR, and raw and normalized coverage:
-            coverage.utr5_raw = None
-            coverage.utr3_raw = None
-            coverage.cds_raw = None
+            scoring.utr5_raw = None
+            scoring.utr3_raw = None
+            scoring.cds_raw = None
         else:
             raise ValueError('Missing database input')
     except ValueError:
         return None
-    return coverage
+    return scoring
 
 def extract_coverage_over_interval(coverage=None, interval=None):
     """Extract the read coverage by position over an HTSeq GenomicInterval().
