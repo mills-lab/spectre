@@ -34,7 +34,7 @@ def initialize_annotation_dataframe(columns=None, dtypes=None, index=None):
     https://bit.ly/2nloFkG
     """
     try:
-        if all([columns, dtypes]):
+        if all([columnsis not None, dtypes is not None]):
             df = pd.DataFrame(index=index)
             for column, datatype in zip(columns, dtypes):
                 df[column] = pd.Series(dtype=datatype)
@@ -58,8 +58,8 @@ def convert_coordinates(coords=None):
             if not converted:
                 raise ValueError('Cooordinate conversion failed')
         else:
-            raise ValueError('Invalid coordinates input')
-    except ValueError:
+            raise NameError('Invalid coordinates input')
+    except (NameError, ValueError):
         return None
     return converted
 
@@ -78,8 +78,8 @@ def collapse_chain_to_ranges(chain=None):
             if not ranges:
                 raise ValueError('Chain merge error')
         else:
-            raise ValueError('Invalid coordinate chain input')
-    except ValueError:
+            raise NameError('Invalid coordinate chain input')
+    except (NameError, ValueError):
         return None
     return ranges
 
@@ -95,8 +95,8 @@ def expand_exons_to_chain(exons=None):
             if not chain:
                 raise ValueError('Exon expansion error')
         else:
-            raise ValueError('Missing or invalid exons input')
-    except ValueError:
+            raise NameError('Missing or invalid exons input')
+    except (NameError, ValueError):
         return None
     return chain
 
@@ -123,8 +123,8 @@ def extract_region_chain(row=None, region=None):
             if not region:
                 raise ValueError('Chain extraction failure')
         else:
-            raise ValueError('Missing row or region input')
-    except (TypeError, ValueError):
+            raise NameError('Missing row or region input')
+    except (NameError, TypeError, ValueError):
         return None
     return region_chain
 
@@ -135,8 +135,8 @@ def load_alignment_file(infile=None):
             if not alignments:
                 raise ValueError('Could not parse BAM file input')
         else:
-            raise ValueError('Missing BAM file input')
-    except ValueError:
+            raise NameError('Missing BAM file input')
+    except (NameError, ValueError):
         return None
     return alignments
 
@@ -158,8 +158,8 @@ def parse_custom_offsets(offsets_file=None):
             if not offsets:
                 raise ValueError('Could not parse offsets')
         else:
-            raise ValueError('Missing offsets file input')
-    except:
+            raise NameError('Missing offsets file input')
+    except (NameError, ValueError):
         return None
     return offsets
 
@@ -179,8 +179,8 @@ def count_mapped_reads(infile=None):
             else:
                 raise ValueError('Invalid subprocess')
         else:
-            raise ValueError('Missing BAM file input')
-    except ValueError:
+            raise NameError('Missing BAM file input')
+    except (NameError, ValueError):
         return None
     return count
 
@@ -202,8 +202,8 @@ def check_input_chromosomes(bam_file=None, annotation_file=None, annotation_type
             else:
                 raise ValueError('Chromosomes could not be parsed from input')
         else:
-            raise ValueError('Missing BAM or annotation file input')
-    except ValueError:
+            raise NameError('Missing BAM or annotation file input')
+    except (NameError, ValueError):
         return False
     return check
 
@@ -220,8 +220,8 @@ def convert_cigar_to_reference_coordinates(cigar=None):
             if not coordinates:
                 raise ValueError('CIGAR conversion failure')
         else:
-            raise ValueError('Missing or invalid CIGAR string input')
-    except ValueError:
+            raise NameError('Missing or invalid CIGAR string input')
+    except (NameError, ValueError):
         return None
     return sorted(set(coordinates))
 
@@ -246,8 +246,8 @@ def offset_read_alignment_positions(bam=None, offsets=None):
             if len(coverage.chrom_vectors) == 0:
                 raise ValueError('Alignment position offset failure')
         else:
-            raise ValueError('Missing BAM input')
-    except ValueError:
+            raise NameError('Missing BAM input')
+    except (NameError, ValueError):
         return None
     return coverage
 
@@ -294,8 +294,8 @@ def parse_regions_from_exons(region=None, row=None):
             else:
                 raise ValueError('Expansion of ranges to chain failure')
         else:
-            raise ValueError('Missing region or row input')
-    except ValueError:
+            raise NameError('Missing region or row input')
+    except (NameError, ValueError):
         return None
     return coordinates
 
@@ -318,16 +318,14 @@ def add_ensembl_record(record=None, database=None, cols=None):
                 if not annotation:
                     raise ValueError('Failure to parse bio|type from attributes')
             else:
-                raise ValueError('Missing record input')
-        except ValueError:
+                raise NameError('Missing record input')
+        except (NameError, ValueError):
             return None
         return annotation
     
     def modify_transcript(rec=None, db=None):
         try:
-            if not all([rec is not None, db is not None]):
-                raise ValueError('Missing record or database input')
-            else:
+            if all([rec is not None, db is not None]):
                 if rec.type == 'start_codon':
                     # Since CDS start and end coordinates are reported according to strand:
                     if rec.iv.strand == '+':
@@ -353,14 +351,14 @@ def add_ensembl_record(record=None, database=None, cols=None):
                             ',' + str(rec.iv.end))
                 else:
                     pass
-        except ValueError:
+            else:
+                raise NameError('Missing record or database input')
+        except NameError:
             pass
         return db
 
     try:
-        if not all([record is not None, database is not None]):
-            raise ValueError('Invalid record or database input')
-        else:
+        if all([record is not None, database is not None]):
             if 'transcript_id' in record.attr:
                 # Only records with a transcript_id attribute are to be parsed:
                 if not (database.transcript_id.any() == record.attr['transcript_id']) and record.type == 'transcript':
@@ -387,7 +385,9 @@ def add_ensembl_record(record=None, database=None, cols=None):
                         str()])), ignore_index=True)
                 else:
                     database = modify_transcript(rec=record, db=database)
-    except ValueError:
+            else:
+                raise NameError('Invalid record or database input')
+    except NameError:
         pass
     return database
 
@@ -400,8 +400,19 @@ def add_ucsc_record(record=None, database=None, cols=None):
     parsing out 5'UTR, CDS, and 3'UTR coordinates.
     """
 
-    def get_transcript_type(rec):
-        return 'non_coding' if rec['cds_start'] == rec['cds_end'] else 'protein_coding'
+    def get_transcript_type(record=None):
+        try:
+            if record is not None:
+                annotation = ('non_coding' if rec['cds_start'] == rec['cds_end'] 
+                    else 'protein_coding')
+                if not annotation:
+                    raise ValueError('Failure to parse bio|type from record')
+            else:
+                raise NameError('Missing or invalid record input')
+        except (NameError, ValueError):
+            return None
+        return annotation
+
     try:
         # UCSC transcripts are contained within a single line:
         if all([record, database is not None]):
@@ -429,6 +440,8 @@ def add_ucsc_record(record=None, database=None, cols=None):
                     str(),
                     str()])), ignore_index=True)
             else:
+                # Since UCSC transcripts are contained in one line, redundant
+                # transcripts should not exist:
                 raise ValueError('Transcript already exists in database')
         else:
             raise NameError('Invalid record or database input')
@@ -446,25 +459,41 @@ def reorder_coordinates(region=None, row=None):
             if not ordered:
                 raise ValueError('Coordinates could not be re-ordered based on input')
         else:
-            raise ValueError('Invalid coordinates input')
-    except ValueError:
+            raise NameError('Invalid coordinates input')
+    except (NameError, ValueError):
         return None
     return ordered
 
 def map_gene_name(mappings=None, row=None):
     # Maps UCSC identifiers to a designated gene identifier and symbol:
-    mapped = None
-    if all([mappings is not None, row is not None]):
-        if row.transcript_id in mappings.ucsc.values:
-            mapped = mappings.symbol[mappings.ucsc == row.transcript_id].values[0]
+    try:
+        if all([mappings is not None, row is not None]):
+            if row.transcript_id in mappings.ucsc.values:
+                mapped = mappings.symbol[mappings.ucsc == row.transcript_id].values[0]
+                if not mapped:
+                    raise ValueError('Mapping of gene name from UCSC identifier failed')
+            else:
+                raise ValueError('Transcript identifier missing from mappings')
+        else:
+            raise NameError('Invalid mappings or missing row input')
+    except (NameError, ValueError):
+        return None
     return mapped
     
 def map_gene_id(mappings=None, row=None):
     # Maps UCSC identifiers to a designated gene identifier and symbol:
-    mapped = None
-    if all([mappings is not None, row is not None]):
-        if row.transcript_id in mappings.ucsc.values:
-            mapped = mappings.ensembl[mappings.ucsc == row.transcript_id].values[0]
+    try:
+        if all([mappings is not None, row is not None]):
+            if row.transcript_id in mappings.ucsc.values:
+                mapped = mappings.ensembl[mappings.ucsc == row.transcript_id].values[0]
+                if not mapped:
+                    raise ValueError('Mapping of gene locus from UCSC identifier failed')
+            else:
+                raise ValueError('Transcript identifier missing from mappings')
+        else:
+            raise NameError('Invalid mappings or missing row input')
+    except (NameError, ValueError):
+        return None
     return mapped
 
 ############
@@ -483,13 +512,16 @@ def initialize_scoring_dataframe(database=None):
     try:
         if database is not None:
             scoring = database[['transcript_id', 'transcript_type', 'utr5_starts', 'cds_starts', 'utr3_starts']]
-            # Add columns for 5'UTR, CDS, 3'UTR, and raw and normalized coverage:
-            scoring.utr5_raw = None
-            scoring.utr3_raw = None
-            scoring.cds_raw = None
+            if not scoring:
+                raise ValueError('Scoring dataframe initialization failure')
+            else:
+                # Add columns for 5'UTR, CDS, 3'UTR, and raw and normalized coverage:
+                scoring.utr5_raw = None
+                scoring.utr3_raw = None
+                scoring.cds_raw = None
         else:
-            raise ValueError('Missing database input')
-    except ValueError:
+            raise NameError('Missing database input')
+    except (NameError, ValueError):
         return None
     return scoring
 
@@ -505,9 +537,11 @@ def extract_coverage_over_interval(coverage=None, interval=None):
                     interval_coverage.extend([len(depth)]*len([pos for pos in iv.xrange()]))
                 else:
                     interval_coverage.extend([depth]*len([pos for pos in iv.xrange()]))
+            if not interval_coverage:
+                raise ValueError('Coverage could not be parsed from input')
         else:
-            raise TypeError('Missing coverage or interval input')
-    except TypeError:
+            raise NameError('Missing coverage or interval input')
+    except (NameError, ValueError):
         return None
     return interval_coverage
 
@@ -527,10 +561,10 @@ def extract_coverage_over_region(row=None, region=None):
                 ranges = list(zip([int(n) for n in row.cds_starts.split(',')], 
                     [int(n) for n in row.cds_ends.split(',')]))
             else:
-                raise TypeError('Invalid region input')
+                raise ValueError('Invalid region input')
         else:
-            raise ValueError('Missing row or region input')
-    except (TypeError, ValueError):
+            raise NameError('Missing row or region input')
+    except (NameError, ValueError):
         return None
     try:
         if ranges is not None:
@@ -538,27 +572,32 @@ def extract_coverage_over_region(row=None, region=None):
             for iv_start, iv_end in ranges:
                 iv = hts.GenomicInterval(chrom=row.chrom, start=iv_start, end=iv_end, strand=row.strand)
                 coverage.extend(extract_coverage_over_interval(coverage=bam, interval=iv))
+            if not coverage:
+                raise ValueError('Coverage could not be parsed from input')
         else:
-            raise ValueError('Missing ranges input')
-    except ValueError:
+            raise NameError('Missing ranges input')
+    except (NameError, ValueError):
         return None
     return (','.join([str(d) for d in coverage]) if row.strand == '+' else 
         ','.join([str(d) for d in coverage[::-1]]))
 
-def normalize_coverage(coverage=None, n_mapped_reads=None):
+def normalize_coverage(coverage=None, mapped_reads=None):
     """Calculate the normalized read depth.
 
     """
     try:
-        if coverage is None:
-            raise ValueError('Missing coverage input')
+        if coverage is not None:
+            # Calculate the max depth, used in case the number of mapped reads
+            # is not defined by the user:
+            max_depth = max([int(depth) for depth in coverage.split(',')])
+            # Calculate the normalized coverage:
+            normalized_coverage = ([int(depth)/n_mapped_reads/1e6 for depth in coverage.split(',')] if mapped_reads
+                else [int(depth)/max_depth for depth in coverage.split(',')])
+            if not normalized_coverage:
+                raise ValueError('Normalized coverage could not be calculated from input')
         else:
-            if n_mapped_reads is not None:
-                normalized_coverage = [int(depth)/n_mapped_reads/1e6 for depth in coverage.split(',')]
-            else:
-                max_depth = max([int(depth) for depth in coverage])
-                normalized_coverage = [int(depth)/max_depth for depth in coverage.split(',')]
-    except ValueError:
+            raise NameError('Missing or invalid coverage input')
+    except (NameError, ValueError):
         return None
     return normalized_coverage
 
@@ -568,30 +607,33 @@ def calculate_normalized_coverage(row=None, region=None, mapped_reads=None):
     """
     try:
         if all([row is not None, region is not None]):
-            if region == '5UTR':
-                normalized = normalize_coverage(coverage=row.utr5_raw, n_mapped_reads=mapped_reads)
-            elif region == '3UTR':
-                normalized = normalize_coverage(coverage=row.utr3_raw, n_mapped_reads=mapped_reads)
-            elif region == 'CDS':
-                normalized = normalize_coverage(coverage=row.cds_raw, n_mapped_reads=mapped_reads)
-            else:
-                raise TypeError('Invalid region input')
+            normalized = (normalize_coverage(coverage=row.utr5_raw, mapped_reads=mapped_reads) if region == '5UTR'
+                else normalize_coverage(coverage=row.utr3_raw, mapped_reads=mapped_reads) if region == '3UTR'
+                else normalize_coverage(coverage=row.cds_raw, mapped_reads=mapped_reads) if region == 'CDS'
+                else None)
+            if not normalized:
+                raise ValueError('Normalized coverage could not be calculated from input')
         else:
-            raise ValueError('Missing row or region input')
-    except (TypeError, ValueError):
+            raise NameError('Missing row or region input')
+    except (NameError, ValueError):
         return None
-    return ','.join([str(nd) for nd in normalized])
+    return ','.join([str(d) for d in normalized])
 
 def calculate_region_length(row=None, region=None):
     try:
         if all([row is not None, region is not None]):
             region_chain = extract_region_chain(row=row, region=region)
+            if not region_chain:
+                raise ValueError('Region chain length could not be calculated from input')
         else:
-            raise ValueError('Missing row or region input')
-    except ValueError:
+            raise NameError('Missing row or region input')
+    except (NameError, ValueError):
         return 0
     return len(region_chain)
 
+###########################################################################################
+# CONTINUE TO STANDARDIZE THE TRY/EXCEPT STRUCTURE OF THE MODULES FROM THIS POINT FORWARD #
+###########################################################################################
 def extract_read_counts_in_region(row=None, region=None):
     """For a given transcript/row, extract the number of reads in each region from the coverage database.
 
@@ -605,7 +647,7 @@ def extract_read_counts_in_region(row=None, region=None):
             elif region == 'CDS':
                 count = sum([int(n) for n in row.cds_raw.split(',')])
             else:
-                raise TypeError('Invalid region input')
+                raise ValueError('Invalid region input')
         else:
             raise ValueError('Missing row or region input')
     except (TypeError, ValueError):
