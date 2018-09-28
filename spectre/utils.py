@@ -611,3 +611,50 @@ def calculate_coherence(row=None, region=None):
         return None
     return MSC
 
+def calculate_error_rate(df=None):
+    """Calculate the empirical error based on the labeled translational status.
+
+    """
+    try:
+        if df is not None:
+            n_inactive = len(list(df.spec[df['status'] == 'inactive']))
+            n_active = len(list(df.spec[df['status'] == 'active']))
+        else:
+            raise ValueError('Missing dataframe input')
+    except ValueError:
+        return None
+    try:
+        rate = n_inactive / (n_inactive + n_active)
+        if not rate:
+            raise ValueError('Cannot calculate error rate')
+    except ValueError:
+        return None
+    return rate
+
+def posterior_probability(row=None, model=None, score=None):
+    """Calculate the posterior probability of translation for a region.
+
+    """
+    try:
+        if all([row is not None, model is not None, score is not None]):
+            # Extract the scores for inactive and active regions:
+            inactive_scores = list(model.cds_coh[model['status'] == 'inactive'])
+            active_scores = list(model.cds_coh[model['status'] == 'active'])
+            # Additional tests for extreme scores:
+            if score == 0:
+                post = 0.0
+            elif score >= max(active_scores):
+                post = 1.0
+            else:
+                # The Bayesian posterior is calculated as:
+                # P(active|score) = (P(score|active) * P(active)) / P(score)
+                p_score_active = len([s for s in active_scores if s >= score]) / len(active_scores)
+                p_active = len(active_scores) / (len(active_scores) + len(inactive_scores))
+                p_score = len([s for s in active_scores + inactive_scores if s >= score]) / (len(active_scores) + len(inactive_scores))
+                # Calculate the Bayesian posterior for the score:
+                post = (p_score_active * p_active) / p_score
+        else:
+            raise ValueError('Missing row, model or score input')
+    except ValueError:
+        return None
+    return post

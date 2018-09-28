@@ -78,11 +78,82 @@ def calculate_coherence_over_region(db=None):
 		return None
 	return db
 
-#def build_translational_probability_model():
+def build_translational_probability_model(db=None, tpm_minimum=None):
+	"""Build the distribution models for translated and non-translated transcripts.
+
+	"""
+	# Create a dataframe with the minimal information required to build the scoring distributions:
+	coding_db = db[['transcript_id', 'transcript_type', 'cds_tpm', 'cds_coh']]
+	# Filter out non-coding transcripts:
+	coding_db = coding_db[coding_db.transcript_type == 'protein_coding']
+	# Label transcripts based on the user-defined TPM cutoff:
+	coding_db['status'] = np.where(coding_db.cds_tpm >= tpm_minimum, 'active', 'inactive')
+	# Return the labeled dataframe:
+	return coding_db
+
+def calculate_posterior_probability_by_region(db=None, model=None):
+	"""Calculate the posterior probability of translation over all transcripts/regions.
+
+	"""
+	try:
+		if all([db is not None, model is not None]):
+			db.gene_post = db.apply(lambda x: calculate_posterior_probability(row=x, scores=model, region='gene'))
+			db.utr5_post = db.apply(lambda x: calculate_posterior_probability(row=x, scores=model, region='5UTR'))
+			db.utr3_post = db.apply(lambda x: calculate_posterior_probability(row=x, scores=model, region='3UTR'))
+			db.cds_post = db.apply(lambda x: calculate_posterior_probability(row=x, scores=model, region='CDS'))
+		else:
+			raise ValueError('Missing database or model scores input')
+	except ValueError:
+		return None
+	return db
+
+def posterior_probability(row=None, scores=None, region=None):
+	"""Calculate the posterior probability of translation for a region.
+
+	"""
+	try:
+		if all([row is not None, scores is not None, region is not None]):
+			# Extract the scores for inactive and active regions:
+			inactive_scores = list(scores.cds_coh[scores['status'] == 'inactive'])
+			active_scores = list(scores.cds_coh[scores['status'] == 'active'])
+			# Calculate the Bayesian posterior components:
+			p_score_active = 
 
 
-#def calculate_posterior_probability():
 
+
+
+
+
+
+
+
+	def calculate_posterior_probability(coding_scores, noncoding_scores, score):
+		if score == "NA" or score == 0.0:
+			return 0.0
+		elif isinstance(score, float) or isinstance(score, int):
+			if score > max(coding_scores):
+				return 1.0
+			else:
+				prob_score_coding = len([n for n in coding_scores if n >= score])/float(len(coding_scores))
+				prob_coding = len(coding_scores)/float(len(coding_scores)+len(noncoding_scores))
+				prob_score = len([n for n in coding_scores+noncoding_scores if n >= score])/float(len(coding_scores)+len(noncoding_scores))
+			return (prob_score_coding * prob_coding) / prob_score
+		else:
+			return 0.0
+
+	def posterior_probability(coding_scores, noncoding_scores, transcript_score):
+		annotation, score = transcript_score
+		gene_type, chrom, strand, gene_id, transcript_id, feature = annotation.split(":")
+		if isinstance(score, int) or isinstance(score, float):
+			return annotation, calculate_posterior_probability(coding_scores, noncoding_scores, score)
+		elif isinstance(score, list):
+			windowed = list()
+			for coh in score:
+				windowed.append(calculate_posterior_probability(coding_scores, noncoding_scores, coh))
+			return annotation, windowed
+		else:
+			return annotation, "NA"
 
 
 
