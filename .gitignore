@@ -1,0 +1,8 @@
+# Ignored directories:
+spectre.egg-info/
+./pytest_cache/
+__pycache__/
+dist/
+
+# Ignore files/types:
+*.pyc
