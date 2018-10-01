@@ -631,9 +631,6 @@ def calculate_region_length(row=None, region=None):
         return 0
     return len(region_chain)
 
-###########################################################################################
-# CONTINUE TO STANDARDIZE THE TRY/EXCEPT STRUCTURE OF THE MODULES FROM THIS POINT FORWARD #
-###########################################################################################
 def extract_read_counts_in_region(row=None, region=None):
     """For a given transcript/row, extract the number of reads in each region from the coverage database.
 
@@ -649,8 +646,8 @@ def extract_read_counts_in_region(row=None, region=None):
             else:
                 raise ValueError('Invalid region input')
         else:
-            raise ValueError('Missing row or region input')
-    except (TypeError, ValueError):
+            raise NameError('Missing row or region input')
+    except (NameError, ValueError):
         return 0
     return count
 
@@ -665,22 +662,16 @@ def calculate_tpm(database=None):
             database.utr5_rpk = database.utr5_count / (database.utr5_length / 1000)
             database.utr3_rpk = database.utr3_count / (database.utr3_length / 1000)
             database.cds_rpk = database.cds_count / (database.cds_length / 1000)
-            # Calculate the RPK values over each transcript:
-            gene_scaler = sum(database.gene_rpk) / 1e6
-            utr5_scaler = sum(database.utr5_rpk) / 1e6
-            utr3_scaler = sum(database.utrc_rpk) / 1e6
-            cds_scaler = sum(database.cds_rpk) / 1e6
             # Divide the RPK values over each region by its respective scaler:
-            database.gene_tpm = database.gene_rpk / gene_scaler
-            database.utr5_tpm = database.utr5_rpk / utr5_scaler
-            database.utr3_tpm = database.utr3_rpk / utr3_scaler
-            database.cds_tpm = database.cds_rpk / cds_scaler
+            database.gene_tpm = database.gene_rpk / (sum(database.gene_rpk) / 1e6)
+            database.utr5_tpm = database.utr5_rpk / (sum(database.utr5_rpk) / 1e6)
+            database.utr3_tpm = database.utr3_rpk / (sum(database.utr3_rpk) / 1e6)
+            database.cds_tpm = database.cds_rpk / (sum(database.cds_rpk) / 1e6)
             # Clean up:
             database.drop('gene_rpk', axis=1, inplace=True)
             database.drop('utr5_rpk', axis=1, inplace=True)
             database.drop('utr3_rpk', axis=1, inplace=True)
             database.drop('cds_rpk', axis=1, inplace=True)
-            del([gene_scaler, utr5_scaler, cds_scaler, utr3_scaler])
         else:
             raise ValueError('Missing database input')
     except ValueError:
@@ -694,9 +685,11 @@ def calculate_coherence(row=None, region=None):
     try:
         if all([row is not None, region is not None]):
             region_chain = extract_region_chain(row=row, region=region)
+            if not region_chain:
+                raise NameError('Region chain could not be generated')
         else:
             raise ValueError('Missing row or region input')
-    except ValueError:
+    except (NameError, ValueError):
         return None
     try:
         # Instantiate the idealized signal, and truncate the signal to the length of the test region:
@@ -711,10 +704,10 @@ def calculate_coherence(row=None, region=None):
             elif region == 'CDS':
                 test_signal = [float(s) for s in row.cds_norm.split(',')]
             else:
-                raise TypeError('Invalid region input')
+                raise NameError('Invalid region input')
         else:
             raise ValueError('Ideal signal could not be generated')
-    except (TypeError, ValueError):
+    except (NameError, ValueError):
         return None
     try:
         f, Cxy = signal.coherence(test_signal, ideal_signal, nperseg=30, noverlap=27)
@@ -735,9 +728,11 @@ def calculate_error_rate(df=None):
         if df is not None:
             n_inactive = len(list(df.spec[df['status'] == 'inactive']))
             n_active = len(list(df.spec[df['status'] == 'active']))
+            if all([n_inactive is None, n_active is None]):
+                raise NameError('Number of inactive/active genes could not be parsed')
         else:
             raise ValueError('Missing dataframe input')
-    except ValueError:
+    except (NameError, ValueError):
         return None
     try:
         rate = n_inactive / (n_inactive + n_active)
@@ -756,21 +751,24 @@ def posterior_probability(row=None, model=None, score=None):
             # Extract the scores for inactive and active regions:
             inactive_scores = list(model.cds_coh[model['status'] == 'inactive'])
             active_scores = list(model.cds_coh[model['status'] == 'active'])
-            # Additional tests for extreme scores:
-            if score == 0:
-                post = 0.0
-            elif score >= max(active_scores):
-                post = 1.0
+            if all([inactive_scores is not None, active_scores is not None]):
+                # Additional tests for extreme scores:
+                if score == 0:
+                    post = 0.0
+                elif score >= max(active_scores):
+                    post = 1.0
+                else:
+                    # The Bayesian posterior is calculated as:
+                    # P(active|score) = (P(score|active) * P(active)) / P(score)
+                    p_score_active = len([s for s in active_scores if s >= score]) / len(active_scores)
+                    p_active = len(active_scores) / (len(active_scores) + len(inactive_scores))
+                    p_score = len([s for s in active_scores + inactive_scores if s >= score]) / (len(active_scores) + len(inactive_scores))
+                    # Calculate the Bayesian posterior for the score:
+                    post = (p_score_active * p_active) / p_score
             else:
-                # The Bayesian posterior is calculated as:
-                # P(active|score) = (P(score|active) * P(active)) / P(score)
-                p_score_active = len([s for s in active_scores if s >= score]) / len(active_scores)
-                p_active = len(active_scores) / (len(active_scores) + len(inactive_scores))
-                p_score = len([s for s in active_scores + inactive_scores if s >= score]) / (len(active_scores) + len(inactive_scores))
-                # Calculate the Bayesian posterior for the score:
-                post = (p_score_active * p_active) / p_score
+                raise NameError('Inactive/active scores could not be parsed')
         else:
             raise ValueError('Missing row, model or score input')
-    except ValueError:
+    except (NameError, ValueError):
         return None
     return post
