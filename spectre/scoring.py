@@ -36,6 +36,22 @@ def calculate_coverage_over_transcript_regions(db=None, bam=None, nreads=None, t
 	# Return the transcript coverage dataframe:
 	return coverage_db
 
+def calculate_coherence_over_regions(db=None):
+	"""Calculate the Welch's coherence over each transcript/region.
+
+	"""
+	try:
+		if db is not None:
+			db.gene_coh = db.apply(lambda x: calculate_coherence(row=x, region='gene'), axis=1)
+			db.utr5_coh = db.apply(lambda x: calculate_coherence(row=x, region='5UTR'), axis=1)
+			db.utr3_coh = db.apply(lambda x: calculate_coherence(row=x, region='3UTR'), axis=1)
+			db.cds_coh = db.apply(lambda x: calculate_coherence(row=x, region='CDS'), axis=1)
+		else:
+			raise ValueError('Missing database input')
+	except ValueError:
+		return None
+	return db
+
 def calculate_transcripts_per_million(db=None):
 	"""Calculate the transcripts per million mapped reads (TPM) for each transcript/region.
 
@@ -62,22 +78,6 @@ def calculate_transcripts_per_million(db=None):
     	return None
 	return db
 
-def calculate_coherence_over_region(db=None):
-	"""Calculate the Welch's coherence over each transcript/region.
-
-	"""
-	try:
-		if db is not None:
-			db.gene_coh = db.apply(lambda x: calculate_coherence(row=x, region='gene'), axis=1)
-			db.utr5_coh = db.apply(lambda x: calculate_coherence(row=x, region='5UTR'), axis=1)
-			db.utr3_coh = db.apply(lambda x: calculate_coherence(row=x, region='3UTR'), axis=1)
-			db.cds_coh = db.apply(lambda x: calculate_coherence(row=x, region='CDS'), axis=1)
-		else:
-			raise ValueError('Missing database input')
-	except ValueError:
-		return None
-	return db
-
 def build_translational_probability_model(db=None, tpm_minimum=None):
 	"""Build the distribution models for translated and non-translated transcripts.
 
@@ -91,80 +91,48 @@ def build_translational_probability_model(db=None, tpm_minimum=None):
 	# Return the labeled dataframe:
 	return coding_db
 
-def calculate_posterior_probability_by_region(db=None, model=None):
+def binary_search_translational_threshold(df=None):
+    """Implements a binary search to identify the empirical translational cutoff.
+
+    """
+    try:
+        if df is not None:
+            # Implement a binary search for the empirical cutoff:
+            found = False
+            first = 0
+            last = len(df.cds_coh[df['status'] == 'inactive'])
+            test_scores = sorted(list(df.cds_coh[df['status'] == 'inactive']))
+            while not found:
+                mid = (first + last) // 2
+                if calculate_error_rate(df[df['cds_coh'] >= test_scores[mid]]) is not None:
+                    if calculate_error_rate(df[df['cds_coh'] >= test_scores[mid]]):
+                        first = mid + 1
+                    else:
+                        # Found the inflection point:
+                        switch = True
+                else:
+                    raise ValueError('Invalid error rate')
+        else:
+            raise ValueError('Missing dataframe or cutoff input')
+    except ValueError:
+        return None
+    # Since the midpoint is re-calculated prior to finding the inflection point,
+    # we want the index immediately prior to the new midpoint:
+    return test_scores[mid-1]
+
+def calculate_posterior_probability_by_region(db=None, model=None, cutoff=None):
 	"""Calculate the posterior probability of translation over all transcripts/regions.
 
 	"""
 	try:
-		if all([db is not None, model is not None]):
-			db.gene_post = db.apply(lambda x: calculate_posterior_probability(row=x, scores=model, region='gene'))
-			db.utr5_post = db.apply(lambda x: calculate_posterior_probability(row=x, scores=model, region='5UTR'))
-			db.utr3_post = db.apply(lambda x: calculate_posterior_probability(row=x, scores=model, region='3UTR'))
-			db.cds_post = db.apply(lambda x: calculate_posterior_probability(row=x, scores=model, region='CDS'))
+		if all([db is not None, model is not None, cutoff is not None]):
+			# First calculate the
+			db.gene_post = db.apply(lambda x: posterior_probability(row=x, scores=model, threshold=cutoff, region='gene'))
+			db.utr5_post = db.apply(lambda x: posterior_probability(row=x, scores=model, threshold=cutoff, region='5UTR'))
+			db.utr3_post = db.apply(lambda x: posterior_probability(row=x, scores=model, threshold=cutoff, region='3UTR'))
+			db.cds_post = db.apply(lambda x: posterior_probability(row=x, scores=model, threshold=cutoff, region='CDS'))
 		else:
 			raise ValueError('Missing database or model scores input')
 	except ValueError:
 		return None
 	return db
-
-def posterior_probability(row=None, scores=None, region=None):
-	"""Calculate the posterior probability of translation for a region.
-
-	"""
-	try:
-		if all([row is not None, scores is not None, region is not None]):
-			# Extract the scores for inactive and active regions:
-			inactive_scores = list(scores.cds_coh[scores['status'] == 'inactive'])
-			active_scores = list(scores.cds_coh[scores['status'] == 'active'])
-			# Calculate the Bayesian posterior components:
-			p_score_active = 
-
-
-
-
-
-
-
-
-
-
-	def calculate_posterior_probability(coding_scores, noncoding_scores, score):
-		if score == "NA" or score == 0.0:
-			return 0.0
-		elif isinstance(score, float) or isinstance(score, int):
-			if score > max(coding_scores):
-				return 1.0
-			else:
-				prob_score_coding = len([n for n in coding_scores if n >= score])/float(len(coding_scores))
-				prob_coding = len(coding_scores)/float(len(coding_scores)+len(noncoding_scores))
-				prob_score = len([n for n in coding_scores+noncoding_scores if n >= score])/float(len(coding_scores)+len(noncoding_scores))
-			return (prob_score_coding * prob_coding) / prob_score
-		else:
-			return 0.0
-
-	def posterior_probability(coding_scores, noncoding_scores, transcript_score):
-		annotation, score = transcript_score
-		gene_type, chrom, strand, gene_id, transcript_id, feature = annotation.split(":")
-		if isinstance(score, int) or isinstance(score, float):
-			return annotation, calculate_posterior_probability(coding_scores, noncoding_scores, score)
-		elif isinstance(score, list):
-			windowed = list()
-			for coh in score:
-				windowed.append(calculate_posterior_probability(coding_scores, noncoding_scores, coh))
-			return annotation, windowed
-		else:
-			return annotation, "NA"
-
-
-
-
-
-
-
-
-
-
-
-
-
-

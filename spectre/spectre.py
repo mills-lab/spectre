@@ -3,18 +3,19 @@
 """SPECtre
 
 Usage: 
-    spectre.py [options] <annotation_file> <bam_file>
+    spectre.py [options] <annotations> <bam>
 
 Arguments:
-	annotation_file	Ensembl GTF or UCSC knownGene file
-	bam_file	Indexed BAM alignment file
+	annotations	Ensembl GTF or UCSC knownGene file
+	bam	Indexed BAM alignment file
 	
 Options:
     -h, --help	Show this screen
-    -o PATH 	Output path [default: .]
+    -o Path to output results [default: ./spectre_results]
+    -m Path to the UCSC-Ensembl map file [default: None]
+    -
+    -t Specify annotation format as GTF [default: GTF]
     -n NUM 	Use <n> threads of analysis [default: 1]
-    -t 	Specify annotation format as GTF [default: GTF]
-    -m 	Path to the UCSC-Ensembl map file [default: .]
 """
 
 
@@ -46,6 +47,11 @@ from anno import *
 def main():
 	# Read in arguments/parameters:
 	arguments = docopt(__doc__)
+	annotation_file = arguments['<annotation_file>']
+	bam_file = arguments
+
+
+
 	print(arguments)
 	annofile = arguments['<annotation_file>']
 	bamfile = arguments['<bam_file>']
@@ -56,51 +62,48 @@ def main():
 	print(annofile)
 	print(bamfile)
 
-	# Validate the chromosome formats in the input files:
-	validated = check_input_chromosomes(bamfile=bamfile, annotationfile=annofile, annotationtype=annotype)
+	# Validate the chromosome formats in the supplied input files:
+	validated = check_input_chromosomes(bamfile=bam_file, annofile=annotation_file, annotype=annotation_type)
 	if not validated:
-		# Write out an error message:
-		#sys.exit()
-		print('Not validated')
-	else:
+		# Validation failure is a fatal error:
+		print('Input validation failed, please check that the choromosomes in your BAM file match your reference annotations.')
+		sys.exit()
+	else:	
+		# Count the number of mapped reads:
+		n_mapped_reads = count_mapped_reads(infile=bamfile)
+
 		# Parse the read alignment offsets:
-		read_offset_positions = parse_custom_offsets(offsets_file=offset_file, default=None)
+		read_offset_positions = parse_custom_offsets(offsets=offsets_file) if offsets_file else None
+
 		# Load BAM file into memory as an HTSeq object:
 		alignments = HTSeq.BAM_Reader(bam_file)
-		# Adjust the coverage to the A-/P-site position:
-		offset_alignments = offset_read_alignment_positions(bam=alignments, offsets=read_offset_positions, targets=target_regions)
-		#if not offset_alignments:
-			# Write out an error message:
-			#sys.exit()
-		#else:
-			# Build the transcript annotation database from the input file:
-			#if annotype == 'UCSC':
-			#	anno_db = (load_ucsc_annotations(infile=annofile, mapfile=mapfile) if mapfile 
-			#		else load_ucsc_annotations(infile=annofile, mapfile=None))
-			#elif annotype == 'GTF':
-			#	anno_db = load_ensembl_annotations(infile=annofile)
-			#else:
-			#	sys.exit()
 
-			# Extract the coverage over each transcript in the annotation database:
+		# Adjust the alignments based on the read offset positions:
+		offset_alignments = offset_read_alignment_positions(bam=alignments, offsets=read_offset_positions)
 
-			# Calculate the normalized coverage over each transcript/region:
+		# Build the transcript annotation database:
+		anno_db = (load_ensembl_annotations(infile=annotation_file) if annotation_type == 'GTF'
+			else load_ucsc_annotations(infile=annotation_file, mapfile=map_file) if (map_file is not None
+			and annotation_type == 'UCSC') else load_ucsc_annotations(infile=annotation_file, mapfile=None)
+			if (map_file is None and annotation_type == 'UCSC')) else None
 
-			# Calculate the transcripts per million mapped reads (TPM) over each transcript and region:
+		# Extract the coverage over each transcript/region, then normalize coverage to number of mapped reads:
+		coverage = calculate_coverage_over_transcript_regions(db=anno_db, bam=bam_file, nreads=n_mapped_reads, threads=nt)
 
-			# Calculate the SPECtre score over each transcript/region:
+		# Calculate the SPECtre score over each transcript/region:
+		coverage = calculate_coherence_over_regions(db=coverage)
 
-			# Build the coding/non-coding score distributions:
+		# Calculate the transcripts per million mapped reads (TPM) over each transcript/region:
+		coverage = calculate_transcripts_per_million(db=coverage)
 
-			# Calculate the posterior probability of translation for each transcript/region:
+		# Build the active/inactive score distributions:
+		model = build_translational_probability_model(db=coverage, tpm_minimum=cutoff)
+		threshold = binary_search_translational_threshold(df=model)
 
-			# Write out summary statistics, and print results to output files:
+		# Calculate the posterior probability of translation for each transcript/region:
+		coverage = calculate_posterior_probability_by_region(db=coverage, model=model, cutoff=cutoff)
 
-
-
-
-
-
+		# Save and/or pickle all databases and results to standard output:
 
 if __name__ == "__main__":
 	main()
