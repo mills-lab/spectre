@@ -7,7 +7,7 @@ Usage:
 
 Arguments:
 	annotations	Ensembl GTF or UCSC knownGene file
-	type Format of annotation file
+	type Format of annotation file (GTF or UCSC)
 	bam	Indexed BAM alignment file
 	
 Options:
