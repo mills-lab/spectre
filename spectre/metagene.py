@@ -2,32 +2,29 @@
 
 """Aggregate transcript window parser
 
-This code is part of the spectre distribution and governed by its
-license. Please see the LICENSE file that should have been included
-as part of this package.
+This code is part of the spectre distribution and governed by its license. Please see the LICENSE file that should have
+been included as part of this package.
 
-This module takes as input a Pandas DataFrame of parsed transcript annotation
-structures and builds an aggregate transcript window database of shared regions
-across a gene family (ie. transcript isoforms). The purpose of these aggregated
-regions is to ensure that the SPECtre scoring distributions are built off of
-unique sections of the transcriptome.
+This module takes as input a Pandas DataFrame of parsed transcript annotation structures and builds an aggregate tran-
+script window database of shared regions across a gene family (ie. transcript isoforms). The purpose of these
+aggregated regions is to ensure that the SPECtre scoring distributions are built off of unique sections of
+the transcriptome.
 
-For example, where U, E, I and indicate untranslated regions, exons, and introns
-respectively, the shared aggregate regions (S) of a family of transcript isoforms
-may be considered as:
+For example, where U, E, and I indicate untranslated regions, exons, and introns respectively, the shared aggregate
+regions (S) of a family of transcript isoforms may be considered as:
 
-				AUG
-POS 	0123456789012345678901234567890123456789012345678901234567890123456789
-ISO1	UUUUUUUUEEEEEEEEEEEIIIIIIIEEEEEEEEIIIIIIIIIIEEEEEEEEEEIIIIIIIEEEEEUUUU
-ISO2	....UUUUEEEEEEEEEEEIIIIIIIEEEEEEEEIIIIIIIIIIEEEEEIIIIIIIIIIIIEEEEEUUUU
-ISO3	..UUUUUUEEEEEEEEEEEIIIIIIIEEEEEEEEIIIIEEEEEEEEEEEEEEEEIIIIIIIEEEEEUUUU
-META	....SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS................................
-SPEC 	........SSSSSSSSSSS.......SSSSSSSS....................................
+                AUG
+POSN    0123456789012345678901234567890123456789012345678901234567890123456789
+ISO1    UUUUUUUUEEEEEEEEEEEIIIIIIIEEEEEEEEIIIIIIIIIIEEEEEEEEEEEEEIIIIEEEEEUUUU
+ISO2    ....UUUUEEEEEEEEEEEIIIIIIIEEEEEEEEIIIIIIIIIIEEEEEIIIIIIIIIIIIEEEEEUUUU
+ISO3    ..UUUUUUEEEEEEEEEEEIIIIIIIEEEEEEEEIIIIEEEEEEEEEEEEEEEEIIIIIIIEEEEEUUUU
+META    ....SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS....SSSSS....
+SPEC    ........SSSSSSSSSSS.......SSSSSSSS....SSSSSSSSSSSSSSSSSSS....SSSSS....
 
-Where ISO1, ISO2 and ISO3 are annotated isoforms of the same gene, and META defines
-the shared aggregate regions across all three isoforms, and SPEC indicate the coding
-portion of those shared isoform regions. Typically, SPECtre will only score the
-shared coding regions of the aggregated metagene to build its scoring distributions.
+Where ISO1, ISO2 and ISO3 are annotated isoforms of the same gene, and META defines the shared aggregate regions across
+all three isoforms, and SPEC indicate the coding portion of those shared isoform regions. Typically, SPECtre will only
+score the shared coding regions of the aggregated metagene to build its scoring distributions.
+
 """
 
 def check_annotations(gene_types=None):
